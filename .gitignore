@@ -1,0 +1,6 @@
+.env
+CLAUDE.local.md
+__pycache__/
+.venv/
+.pytest_cache/
+results/raw/
