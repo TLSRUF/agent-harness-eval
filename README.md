@@ -1,5 +1,7 @@
 # agent-harness-eval
 
+**한국어** | [English](README.en.md)
+
 (작성 예정: 문제 -> 접근 -> 결과 수치 3줄)
 
 주 실험 모델은 claude-haiku-5-5이며, claude-sonnet-5-5는 비교용 부분 실행이다.
