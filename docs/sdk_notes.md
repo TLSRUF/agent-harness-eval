@@ -86,6 +86,12 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 - `ResultError`는 `ProcessError`의 하위 클래스. `is_error` 결과 후 CLI가 비정상 종료할 때 `query()`가 던진다. 러너에서 try/except로 받아 기록해야 한다.
 - **비용 주의**: `tools=[]`, `setting_sources=[]`인데도 1회 실행에 cache_creation 31,329 토큰이 발생했다(고정 시스템 프롬프트 오버헤드로 추정). 구독 한도 계획에 반영한다. 캐시가 재사용되는지는 Day 3 이후 반복 실행에서 확인.
 
+## Day 2 실검증 결과 (샌드박스)
+- 구성: `tools=["Read","Write","Edit","Glob","Grep"]`(Bash 등은 존재하지 않음) + `allowed_tools`(내장+커스텀) + `permission_mode="dontAsk"` + `setting_sources=[]` + PreToolUse 훅(`sandbox_hooks`).
+- 훅은 `HookMatcher(matcher="Read|Write|Edit|Glob|Grep", hooks=[cb])`로 등록하고, cb는 `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": ...}}`를 반환해 거부한다. 거부되면 모델에게 `ToolResultBlock(is_error=True)`로 전달된다.
+- Haiku로 3개 시나리오 실행: 내장 Read가 밖 파일을 읽기, 내장 Write가 밖에 쓰기, 커스텀 도구가 `../`로 접근하기. 모두 차단됐고 비밀 문자열 유출과 밖 파일 생성은 없었다.
+- 이 검증은 훅+도구 내부 검사의 조합을 검증한 것이다. `dontAsk` 단독으로 cwd 밖 접근을 막는지는 따로 검증하지 않았다(훅이 항상 켜져 있으므로 필수 아님). 내장 도구의 경로 키는 `file_path`/`path`/`notebook_path`와 Glob의 `pattern`만 검사한다. SDK 업그레이드 시 `tests/test_sandbox_tools.py`와 `python -m src.agent.sandbox_live`를 다시 돌린다.
+- 한계: 내장 `Grep`의 `glob` 인자 등 다른 키는 검사하지 않는다. Bash는 켜지 않는다.
+
 ## 아직 미확인
 1. `max_turns` 도달 시 정확한 동작(예외 vs `error_max_turns` ResultMessage) — Day 3에서 확인
-2. cwd 밖 경로 접근이 `dontAsk`에서 실제로 거부되는지 — Day 2에서 확인
