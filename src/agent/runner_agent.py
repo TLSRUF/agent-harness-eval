@@ -11,10 +11,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 from claude_agent_sdk import (
-    ClaudeAgentOptions, ClaudeSDKError, ResultMessage, ToolResultBlock, ToolUseBlock, query,
+    ClaudeAgentOptions, ClaudeSDKError, RateLimitEvent, ResultMessage, ToolResultBlock, ToolUseBlock, query,
 )
 
 from .config import HarnessConfig
+from .ratelimit import extract_windows
 from .tools import ALLOWED_CUSTOM, SERVER_NAME, build_server, sandbox_hooks
 
 RESULTS_DIR = Path("results")
@@ -98,6 +99,7 @@ async def run_task(
         "task_id": task_id, "subtype": None, "is_error": None, "terminal_reason": None, "num_turns": None,
         "duration_ms": None, "total_cost_usd": None, "usage": None, "tool_calls": 0, "tool_errors": 0,
         "result": None, "exception": None, "graded": None,
+        "rate_limit_events": [],  # 구독 전체 사용률 스냅샷(오염 가능). 델타는 ratelimit.delta 참고
     }
     t0 = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="task_") as td:
@@ -108,6 +110,10 @@ async def run_task(
         try:
             async for m in query(prompt=prompt, options=build_options(cfg, workdir)):
                 log.write("message", message=to_jsonable(m))
+                if isinstance(m, RateLimitEvent):
+                    snap = extract_windows(m.rate_limit_info)
+                    snap["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
+                    summary["rate_limit_events"].append(snap)
                 content = getattr(m, "content", None)
                 if isinstance(content, list):
                     for b in content:

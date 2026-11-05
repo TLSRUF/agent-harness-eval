@@ -14,3 +14,8 @@
 - 한 일: config 확장(프롬프트 버전, 허용 도구, 파일명용 약칭), runner_agent.py(임시 폴더, 샌드박스, trajectory jsonl, 예외 기록, grader 훅), pytest 6개 추가(총 20개), Haiku 3회 실행.
 - 숫자: 시연 과제 5턴, 성공, 약 $0.011/회. max_turns=1은 error_max_turns 결과 + ResultError 예외가 둘 다 발생. 캐시는 실행 내에서만 재사용, 실행 간 미재사용.
 - 다음 할 일: Day 4 과제 포맷(YAML/JSON), graders.py, 쉬운 과제 15개와 정답 풀이 스크립트.
+
+## Day 3 후속 점검 (2026-11-05)
+- 한 일: 로그 분석, 에이전트가 보는 도구 목록 확인, 캐시 원인 실험(4회), max_turns 실험(4회), 한도 사용률 스냅샷 기록 추가(ratelimit.py), report.py 설계 메모.
+- 숫자: max_turns 한계 도달 시 num_turns = 설정값+1. 임시 폴더는 큰 캐시 비용의 원인이 아님(약 40k 블록은 고정 cwd에서도 재생성). utilization 해상도 0.01, 노이즈 ±0.01 → 과제 단위 델타 측정 불가.
+- 결정 대기: ① claude.ai 커넥터 도구 약 60개가 에이전트에 노출됨(차단 여부) ② 선택 항목이 required로 노출되는 스키마 문제. Day 4 전에 정해야 베이스라인 동결 전 반영 가능.

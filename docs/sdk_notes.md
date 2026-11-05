@@ -101,6 +101,45 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 - **캐시**: 한 실행 안에서는 캐시가 재사용된다(5턴 실행: cache_create 약 43k, cache_read 약 171k). 실행 간 재사용은 관찰되지 않았다(같은 과제를 2회 연속 실행했는데 둘째도 cache_create 약 42k). 과제별 임시 폴더 경로가 프롬프트 앞부분에 들어가 접두사가 달라지는 것이 원인으로 의심되나 검증하지 않았다.
 - **비용 감**: 5턴 과제 1회 약 $0.010~0.011(정가 기준 추정). 40개 x 3회 베이스라인은 단순 곱으로 약 $1.3이나, 이것은 정가 환산이며 구독 한도 소모와는 다르다.
 
+## Day 3 후속 검증 (2026-11-05, Haiku 호출 8회)
+
+### 에이전트가 실제로 보는 도구 목록
+- 출처: 초기화 `SystemMessage.data["tools"]`는 도구 **이름만** 제공한다. 설명과 입력 스키마는 이 메시지에 없다.
+- **커스텀 도구**의 설명·스키마는 MCP `tools/list`로 확인했다 (아래 표). 내장 도구(Read, Grep 등)의 설명 전문과 스키마는 로그, SDK 패키지(`claude.exe` 번들), 확인한 문서 페이지에서 볼 수 없었다. 로그로 확인한 것은 호출 시 쓰인 인자 이름뿐이다 (Grep: `pattern`, `path`, `output_mode` / Write: `file_path`, `content`).
+- **발견 1 (중요)**: `tools` 목록에 우리 8개 외에 **claude.ai 커넥터 MCP 도구 약 60개**(Gmail, CoinGecko, Crypto.com, Claude Docs 등)가 포함된다. `mcp_servers`에도 `source: claudeai`로 연결되어 있다. `dontAsk`라서 호출은 거부되겠지만 모델에게 노출되고 컨텍스트를 차지한다. 이는 (a) "허용 도구를 명시적으로 제한" 원칙과 CLAUDE.local.md의 "크립토 관련 내용 제외" 방침에 어긋나고 (b) 실행당 약 40k 캐시 생성 토큰의 후보 원인이다(검증 전). 해결 후보: `strict_mcp_config=True`, `disallowed_tools`에 커넥터 접두사 지정 등. **러너는 아직 바꾸지 않았다. 사용자 결정 대기.**
+- **발견 2**: `{"query": str, "path": str}` 형태의 간단 스키마는 모든 항목을 `required`로 만든다. 설명은 "optionally"인데 `check_result`의 `contains`, `min_lines`, `search_text`의 `path`가 필수로 노출된다. 실제 로그에서 에이전트가 `min_lines: 1`을 채워 넣었다. 선택 항목을 쓰려면 JSON Schema dict로 `required`를 직접 지정해야 한다. 베이스라인 동결 전에 결정할 문제다.
+
+| 구분 | 이름 | 설명(현재 default) | 입력(JSON Schema, required) |
+|---|---|---|---|
+| 커스텀 | search_text | Search for a text string in files under a folder. Returns matching lines as path:line:text. | query:string, path:string (둘 다 required) |
+| 커스텀 | file_stats | Return line count, word count and byte size of a text file. | path:string (required) |
+| 커스텀 | check_result | Check that a file exists and optionally contains a string or has a minimum line count. Returns PASS or FAIL with reasons. | path:string, contains:string, min_lines:integer (모두 required) |
+| 내장 | Read, Grep, Glob, Write, Edit | 확인 불가 | 확인 불가 (Grep/Write의 관찰된 인자명만 위에 기재) |
+
+### 캐시 원인 실험 (호출 4회, 같은 과제, 연속 실행)
+- `ResultMessage.usage`는 응답 단위로 중복 제거된 합계다. `AssistantMessage.usage`는 같은 API 응답의 블록마다 값이 반복되므로 메시지별로 합하면 이중 계산된다 (같은 `message_id`로 중복 제거 필요).
+- 각 실행에는 첫 요청(약 4.3k 토큰)과 두 번째 요청(약 44k 토큰 컨텍스트, 캐시 생성 약 33~41k)이 있다. 이후 턴은 약 44k를 캐시에서 읽는다.
+- 첫 요청: 고정 cwd 2번째 실행은 create=0, read=4313(전부 재사용). 임시 폴더는 두 번 모두 create=379, read=3889 (cwd 경로가 들어간 약 380 토큰만 재사용 안 됨).
+- 두 번째 요청(큰 블록): 고정 cwd든 임시 폴더든 매 실행 새로 생성됐다 (고정 cwd 2번째 실행도 create 33.5k + 41.1k). **임시 폴더 경로는 큰 비용의 원인이 아니다.** 큰 블록이 왜 재사용되지 않는지는 미확인이다.
+
+### max_turns 실험 (호출 4회, 같은 과제, 정상 소요 5턴)
+- 설정값 1/2/3 → 보고 `num_turns` 2/3/4, `subtype=error_max_turns`, `terminal_reason=max_turns`, `is_error=True`, 실제 API 응답 수는 1/2/3. 즉 **한계에 걸리면 num_turns = max_turns + 1** 이다. 설정값 5 → `num_turns=5`, `success`, 응답 5개.
+- 예외 `ResultError`는 error_max_turns인 3건 모두에서 발생했고 success에서는 없었다.
+- **max_turns=3에서 error_max_turns인데 채점은 통과**했다 (최종 답변 전에 파일 작성까지 끝남). subtype만으로 성패를 판단하면 안 된다.
+
+### report.py 설계 메모 (턴 제한 실패 분리 집계)
+- 한 실행을 (subtype, 채점 통과 여부) 두 축으로 분류한다: ① success+통과 ② success+실패(오답) ③ error_max_turns+통과(턴 제한에 걸렸지만 결과물은 정답) ④ error_max_turns+실패(턴 제한이 실패 원인) ⑤ 기타 error_* / 예외.
+- 성공률은 채점 통과 기준(①+③)으로 계산하고, "턴 제한 실패율"은 ④/전체로 따로 낸다. ③은 별도 보고한다(실험 C의 핵심 신호).
+- `exception`(ResultError)만으로 크래시로 분류하지 않는다. `subtype == "error_max_turns"`이면 예외를 무시하고 ③/④로 분류한다.
+- 평균 턴 수는 `num_turns`를 쓰되, error_max_turns는 설정값+1로 보고됨을 표에 주석으로 달거나 `min(num_turns, max_turns)`로 보정해 병기한다.
+
+### 구독 한도 사용률(RateLimitEvent) 관찰 (20개 이벤트, 8회+3회 실행)
+- 값은 `raw.unifiedWindows.five_hour/seven_day.utilization`에 있다. SDK가 모델링한 최상위 `utilization`은 항상 None이었다.
+- 해상도는 0.01 단위(소수 둘째 자리)로만 관찰됐다. 이벤트는 실행당 1~4개 나온다. 첫 실행들에서는 1개였다.
+- **단조 증가가 아니다**: 같은 실행 안에서 five_hour가 0.27 → 0.28 → 0.27처럼 수 초 간격으로 오르내렸다 (노이즈 또는 서버 측 근사로 보이나 원인은 미확인).
+- 이 세션의 harness 실행 11회(약 $0.1 정가 환산)가 있는 동안 five_hour는 0.19(07:28) → 0.25(07:43) → 0.28(07:45)로 움직였다. 07:28~07:43의 15분 동안 harness 호출은 없었으므로 이 변화(+0.06)는 다른 사용(이 대화 자체 등)에서 왔다. **구독 전체 사용량이라 오염된다는 가정이 관찰로 뒷받침된다.**
+- 결론(관찰 범위 내): 과제 1개의 비용(약 $0.01)은 해상도(0.01)와 노이즈(±0.01) 이하라 **과제 단위 델타는 측정 불가**에 가깝다. 의미 있는 값은 수십 회 묶음의 합계 정도다. 러너는 시작/끝 스냅샷과 이벤트 전체를 기록하고(`summary.rate_limit_events`), 델타는 `ratelimit.delta()`로 사후 계산하되 참고값으로만 쓴다.
+
 ## 아직 미확인
-1. 실행 간 캐시 재사용을 막는 원인(임시 폴더 경로?)과 회피 가능 여부
-2. 구독 한도(five_hour/seven_day) 대비 실제 소모량: 이번 3회 실행 전후 utilization 비교는 하지 않았다
+1. 매 실행 새로 생성되는 약 40k 캐시 블록의 정체와 재사용 불가 원인 (커넥터 도구 노출이 후보)
+2. utilization 노이즈의 원인, 그리고 utilization이 실제로 무엇의 비율인지 (토큰? 요청? 가중치?)
