@@ -24,6 +24,39 @@ DESCRIPTIONS: dict[str, dict[str, str]] = {
 }
 
 
+# 입력 스키마 (베이스라인 도구 정의 v1). 선택 항목은 required에서 제외한다.
+SCHEMAS: dict[str, dict[str, Any]] = {
+    "search_text": {
+        "type": "object",
+        "properties": {"query": {"type": "string"}, "path": {"type": "string"}},
+        "required": ["query"],
+    },
+    "file_stats": {
+        "type": "object",
+        "properties": {"path": {"type": "string"}},
+        "required": ["path"],
+    },
+    "check_result": {
+        "type": "object",
+        "properties": {"path": {"type": "string"}, "contains": {"type": "string"}, "min_lines": {"type": "integer"}},
+        "required": ["path"],
+    },
+}
+
+
+def classify_tool(name: str) -> str:
+    """SDK가 부여한 도구 이름으로 종류를 판정한다: 'custom' | 'builtin' | 'other'.
+
+    커스텀 도구 이름 형식은 mcp__<서버키>__<도구명> (서버키 SERVER_NAME='t').
+    판정은 접두사 mcp__t__ 와 내장 이름 목록으로만 한다 (이 함수가 유일한 판정 지점).
+    """
+    if name.startswith(f"mcp__{SERVER_NAME}__"):
+        return "custom"
+    if name in BUILTIN_CANDIDATES:
+        return "builtin"
+    return "other"
+
+
 def _ok(text: str) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": text}]}
 
@@ -100,15 +133,15 @@ def build_server(root: str | Path, desc_version: str = "default"):
     root = Path(root).resolve()
     d = DESCRIPTIONS[desc_version]
 
-    @tool("search_text", d["search_text"], {"query": str, "path": str})
+    @tool("search_text", d["search_text"], SCHEMAS["search_text"])
     async def search_text(args: dict[str, Any]) -> dict[str, Any]:
         return search_text_impl(root, args.get("query", ""), args.get("path") or ".")
 
-    @tool("file_stats", d["file_stats"], {"path": str})
+    @tool("file_stats", d["file_stats"], SCHEMAS["file_stats"])
     async def file_stats(args: dict[str, Any]) -> dict[str, Any]:
         return file_stats_impl(root, args.get("path", ""))
 
-    @tool("check_result", d["check_result"], {"path": str, "contains": str, "min_lines": int})
+    @tool("check_result", d["check_result"], SCHEMAS["check_result"])
     async def check_result(args: dict[str, Any]) -> dict[str, Any]:
         return check_result_impl(root, args.get("path", ""), args.get("contains", ""), args.get("min_lines", 0))
 
