@@ -1,9 +1,9 @@
 """커넥터 노출 확인 + 차단 시험 (호출 3회). 레포 설정은 바꾸지 않고 옵션만 덮어쓴다.
 
-1) probe: 현재 설정에서 커넥터 도구(Claude Docs guide)를 호출할 수 있는지
+1) probe: 현재 설정에서 커넥터 도구(인자로 받은 읽기 전용 도구 이름)를 호출할 수 있는지
 2) blocked x2: env ENABLE_CLAUDEAI_MCP_SERVERS=false 로 같은 데모 과제 실행
 
-실행: python -m src.agent.exp_connectors
+실행: python -m src.agent.exp_connectors <커넥터 도구 전체 이름, 예: mcp__claude_ai_<서비스>__<도구>>
 """
 import asyncio
 import dataclasses
@@ -18,8 +18,8 @@ from .runner_agent import RAW_DIR, result_path, run_task
 
 CUSTOM = {"mcp__t__search_text", "mcp__t__file_stats", "mcp__t__check_result"}
 BUILTIN = {"Read", "Write", "Edit", "Glob", "Grep"}
-PROBE = ("Call the tool named mcp__claude_ai_Claude_Docs__guide (no arguments needed if possible) and tell me "
-         "exactly what happened: did the call succeed, or was it denied or unavailable?")
+PROBE_TEMPLATE = ("Call the tool named {tool} (no arguments needed if possible) and tell me "
+                  "exactly what happened: did the call succeed, or was it denied or unavailable?")
 
 _orig_build = runner_agent.build_options
 
@@ -86,8 +86,9 @@ async def one(label: str, prompt: str, cfg: HarnessConfig, fx: Path, run: int) -
         print(json.dumps(tools, ensure_ascii=False))
 
 
-async def main() -> None:
+async def main(probe_tool: str) -> None:
     cfg = HarnessConfig()
+    PROBE = PROBE_TEMPLATE.format(tool=probe_tool)
     with tempfile.TemporaryDirectory() as fx:
         fxp = Path(fx)
         make_fixtures(fxp)
@@ -99,4 +100,7 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import sys
+    if len(sys.argv) != 2 or not sys.argv[1].startswith("mcp__claude_ai_"):
+        raise SystemExit("usage: python -m src.agent.exp_connectors mcp__claude_ai_<service>__<tool>")
+    asyncio.run(main(sys.argv[1]))

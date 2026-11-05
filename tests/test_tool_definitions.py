@@ -64,7 +64,7 @@ def test_classify_tool():
     assert classify_tool("mcp__t__check_result") == "custom"
     for b in ("Read", "Write", "Edit", "Glob", "Grep"):
         assert classify_tool(b) == "builtin"
-    assert classify_tool("mcp__claude_ai_외부 커넥터__send_message") == "other"
+    assert classify_tool("mcp__claude_ai_Example__send_message") == "other"
     assert classify_tool("Bash") == "other"
 
 
