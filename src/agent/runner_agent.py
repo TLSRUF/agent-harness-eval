@@ -1,6 +1,7 @@
 """에이전트 1회 실행 래퍼. 과제별 임시 폴더, 샌드박스, trajectory jsonl 로깅을 담당한다."""
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import json
 import shutil
@@ -11,10 +12,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 from claude_agent_sdk import (
-    ClaudeAgentOptions, ClaudeSDKError, RateLimitEvent, ResultMessage, ToolResultBlock, ToolUseBlock, query,
+    ClaudeAgentOptions, ClaudeSDKError, RateLimitEvent, ResultMessage, SystemMessage, ToolResultBlock, ToolUseBlock, query,
 )
 
 from .config import HarnessConfig
+from .guard import ToolGuardError, allowed_tool_names, tools_digest, unexpected_tools
 from .ratelimit import extract_windows
 from .tools import ALLOWED_CUSTOM, SERVER_NAME, build_server, sandbox_hooks
 
@@ -111,34 +113,49 @@ async def run_task(
         workdir = Path(td).resolve()
         if fixtures_dir is not None:
             shutil.copytree(fixtures_dir, workdir, dirs_exist_ok=True)
-        log.write("config", task_id=task_id, config=cfg.to_dict(), prompt=prompt)
+        # 첫 줄: 설정과 '허용 도구 목록'의 해시/개수 (관찰된 목록은 init 도착 후 tool_guard 이벤트에 기록)
+        allowed = allowed_tool_names(cfg)
+        log.write("config", task_id=task_id, config=cfg.to_dict(), prompt=prompt,
+                  allowed_tools_sha256=tools_digest(allowed)["sha256"], allowed_tools_count=len(allowed))
+        guard_error: ToolGuardError | None = None
         try:
-            async for m in query(prompt=prompt, options=build_options(cfg, workdir)):
-                log.write("message", message=to_jsonable(m))
-                if isinstance(m, RateLimitEvent):
-                    snap = extract_windows(m.rate_limit_info)
-                    snap["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
-                    summary["rate_limit_events"].append(snap)
-                content = getattr(m, "content", None)
-                if isinstance(content, list):
-                    for b in content:
-                        if isinstance(b, ToolUseBlock):
-                            summary["tool_calls"] += 1
-                        elif isinstance(b, ToolResultBlock) and b.is_error is True:
-                            summary["tool_errors"] += 1
-                if isinstance(m, ResultMessage):
-                    summary.update(
-                        subtype=m.subtype, is_error=m.is_error, terminal_reason=m.terminal_reason,
-                        num_turns=m.num_turns, duration_ms=m.duration_ms, total_cost_usd=m.total_cost_usd,
-                        usage=m.usage, result=m.result,
-                    )
+            async with contextlib.aclosing(query(prompt=prompt, options=build_options(cfg, workdir))) as stream:
+                async for m in stream:
+                    log.write("message", message=to_jsonable(m))
+                    if isinstance(m, SystemMessage) and m.subtype == "init":
+                        observed = list(m.data.get("tools", []))
+                        extra = unexpected_tools(observed, cfg)
+                        dg = tools_digest(observed)
+                        log.write("tool_guard", observed_tools_sha256=dg["sha256"], observed_tools_count=dg["count"],
+                                  ok=not extra, unexpected=extra)
+                        if extra:
+                            guard_error = ToolGuardError(f"unexpected tools in init message: {extra}")
+                            summary["exception"] = f"ToolGuardError: {guard_error}"
+                            break
+                    if isinstance(m, RateLimitEvent):
+                        snap = extract_windows(m.rate_limit_info)
+                        snap["elapsed_ms"] = int((time.monotonic() - t0) * 1000)
+                        summary["rate_limit_events"].append(snap)
+                    content = getattr(m, "content", None)
+                    if isinstance(content, list):
+                        for b in content:
+                            if isinstance(b, ToolUseBlock):
+                                summary["tool_calls"] += 1
+                            elif isinstance(b, ToolResultBlock) and b.is_error is True:
+                                summary["tool_errors"] += 1
+                    if isinstance(m, ResultMessage):
+                        summary.update(
+                            subtype=m.subtype, is_error=m.is_error, terminal_reason=m.terminal_reason,
+                            num_turns=m.num_turns, duration_ms=m.duration_ms, total_cost_usd=m.total_cost_usd,
+                            usage=m.usage, result=m.result,
+                        )
         except ClaudeSDKError as e:  # ResultError 포함: 오류 결과 뒤 CLI가 비정상 종료한 경우
             summary["exception"] = f"{type(e).__name__}: {e}"
             log.write("exception", type=type(e).__name__, error=str(e))
         except Exception as e:  # 예기치 못한 실패도 기록하고 호출자에게 결과를 돌려준다
             summary["exception"] = f"{type(e).__name__}: {e}"
             log.write("exception", type=type(e).__name__, error=str(e))
-        if grader is not None:
+        if grader is not None and guard_error is None:
             try:
                 summary["graded"] = to_jsonable(grader(workdir))
             except Exception as e:
@@ -147,4 +164,6 @@ async def run_task(
     summary["wall_ms"] = int((time.monotonic() - t0) * 1000)
     log.write("summary", **summary)
     log.close()
+    if guard_error is not None:
+        raise guard_error  # 배치가 계속되지 않도록 호출자에게 전파한다
     return summary

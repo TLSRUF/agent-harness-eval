@@ -160,7 +160,9 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 
 - 코드 위치: `src/agent/tools.py`의 `DESCRIPTIONS`, `SCHEMAS`. `tests/test_tool_definitions.py`가 서버의 `tools/list` 결과가 이 정의와 일치하는지, 선택 항목을 생략한 호출이 되는지 검사한다.
 - 내장 도구(Read, Write, Edit, Glob, Grep)의 설명 전문과 스키마는 확인 불가(설정 가능한 값도 아님).
-- 에이전트 환경: 커넥터 차단 `env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"}`를 `runner_agent.HARNESS_ENV`로 모든 실행에 적용한다. 이 값도 베이스라인 이후 바꾸지 않는다.
+- **에이전트 환경 (v1의 일부, 베이스라인 이후 변경 금지)**: 커넥터 차단 `env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"}` (`runner_agent.HARNESS_ENV`, 모든 실행에 적용).
+- **런타임 가드 (v1의 일부)**: (1) 매 실행 init 메시지의 도구 이름이 허용 목록(커스텀 3 + 내장 5 = 8개)에 없는 이름을 포함하면 실행을 중단하고 `ToolGuardError`를 낸다(`src/agent/guard.py`, `run_task`). 각 jsonl 첫 줄(`config`)에 허용 목록의 정렬 sha256과 개수, 이어서 `tool_guard` 이벤트에 관찰된 목록의 sha256/개수/통과 여부를 기록한다. (2) **init 목록만으로는 커넥터 노출을 못 잡는다**(차단 전에도 14회 중 13회 init이 8개였다). 그래서 배치 시작 전 `preflight_check()`가 `get_mcp_status()`로 서버가 `t`뿐인지 확인하고 `get_context_usage()`의 "MCP tools" 토큰을 기록한다(모델 호출 없음). preflight는 Day 7 러너에서 배치 시작 시 호출하도록 연결해야 한다(현재는 함수와 수동 실행만 있음).
+- 위 설정과 가드는 베이스라인(Day 8) 이후 바꾸지 않는다. 바꾸면 모든 실험의 기준이 달라진다.
 
 ## 도구 이름 형식과 종류 판정
 - jsonl에는 SDK가 부여한 이름을 그대로 저장한다. 실제 로그에서 확인한 형식: 커스텀 `mcp__t__<도구명>` (서버 키가 `t`), 내장은 `Read`, `Write`, `Edit`, `Glob`, `Grep` 그대로, 커넥터는 `mcp__claude_ai_<서비스>__<도구명>`.
@@ -171,6 +173,15 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 - 성공률 = 채점 통과 실행 수(success+통과, error_max_turns+통과) / 채점된 실행 수. 선택률과 별도 줄에 보고하고 합치지 않는다.
 - 성패 분류: (subtype, 채점) 5범주 + 채점이 없는 실행용 "채점 없음". 표본 크기 문구 `N=…, 과제당 M회 / 총 K건`은 `sample_label()`이 데이터에서 세어 만든다. 선택률 계산 실행이 30건 미만이면 "표본이 작아 해석에 주의"가 붙는다. 그래프 제목용은 `chart_title()`.
 - 과제 정의의 overlap_with는 `{"과제id": ["search_text|Grep", ...]}` 형식으로 `--overlap`에 전달한다(Day 4에서 과제 로더가 연결).
+
+## 커넥터 노출 측정 (2026-11-05, `get_mcp_status` / `get_context_usage`, 모델 호출 없음)
+| | 연결된 서버 | MCP 도구 토큰 | 합계 컨텍스트 |
+|---|---|---|---|
+| 차단 안 함 | claude.ai 커넥터 9개(연결됨 5, needs-auth 4) + `t` | 44,688 | 49,357 |
+| 차단함(HARNESS_ENV) | `t` 1개 | 122 | 3,338 |
+- 확인됨: 차단하지 않으면 커넥터 도구 정의가 약 44.7k 토큰을 차지하고, 차단하면 사라진다. 일부 도구는 `isLoaded: false`(지연 로딩)로 표시된다.
+- 가능성 높음(직접 확인은 아님): 매 실행 새로 만들어지던 약 40k 캐시 블록이 이 커넥터 도구 정의다(크기가 근접하고 차단 시 사라짐).
+- 확인 불가: 큰 블록이 어떤 실행에서 두 번 만들어졌던 메커니즘. 차단 후 5회에서는 0회 나타났다.
 
 ## 아직 미확인
 1. 매 실행 새로 생성되는 약 40k 캐시 블록의 정체와 재사용 불가 원인 (커넥터 도구 노출이 후보)

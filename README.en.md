@@ -6,6 +6,8 @@
 
 The primary experiment model is claude-haiku-5-5. claude-sonnet-5-5 is used only for a partial comparison run.
 
+This harness blocks external connectors linked to the account from being loaded into the agent, and aborts the run if the tool list differs from the allow-list.
+
 **Core question:** with the same model, how much do success rate and cost change depending on the harness configuration (tool descriptions, verification step, max turns, model)?
 
 ## Quick start
