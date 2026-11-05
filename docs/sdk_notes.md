@@ -148,6 +148,30 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 - 위 "아직 미확인 1번"(큰 블록의 정체)은 가설 수준으로 좁혀졌다. 차단은 비용을 약 10~20배 줄이므로 Day 8 베이스라인 예상 비용과 한도 계획에 직접 영향이 있다.
 - 부수 관찰(표본 작음): 데모 과제의 ERROR 검색 도구 선택은 차단 전 11회 모두 Grep(11/11), 차단 후 2회는 search_text 1회·Grep 1회였다. 차단이 선택에 영향을 주는지는 이 표본(N=1개 과제, 2회)으로는 알 수 없다.
 
+## 베이스라인 도구 정의 v1 (2026-11-05 확정)
+
+**규칙: 베이스라인(Day 8) 이후에는 아래 도구 정의(이름, 설명, 입력 스키마)를 바꾸지 않는다.** 실험 A에서 바꾸는 것은 `DESCRIPTIONS`의 별도 설명 버전(config의 `tool_desc_version`)뿐이며, 이름과 스키마는 고정이다. 이번 수정은 베이스라인 전에만 허용되는 정의 오류 수정이었다: `check_result`의 `contains`, `min_lines`와 `search_text`의 `path`가 설명과 달리 required였던 것을 선택 항목으로 바꿨다(구현은 이미 기본값을 처리했다).
+
+| 이름(SDK 부여 이름) | 설명 (tool_desc_version=default) | 입력 스키마 (JSON Schema) |
+|---|---|---|
+| `mcp__t__search_text` | Search for a text string in files under a folder. Returns matching lines as path:line:text. | properties: query:string, path:string / **required: [query]** (path 생략 시 ".") |
+| `mcp__t__file_stats` | Return line count, word count and byte size of a text file. | properties: path:string / **required: [path]** |
+| `mcp__t__check_result` | Check that a file exists and optionally contains a string or has a minimum line count. Returns PASS or FAIL with reasons. | properties: path:string, contains:string, min_lines:integer / **required: [path]** |
+
+- 코드 위치: `src/agent/tools.py`의 `DESCRIPTIONS`, `SCHEMAS`. `tests/test_tool_definitions.py`가 서버의 `tools/list` 결과가 이 정의와 일치하는지, 선택 항목을 생략한 호출이 되는지 검사한다.
+- 내장 도구(Read, Write, Edit, Glob, Grep)의 설명 전문과 스키마는 확인 불가(설정 가능한 값도 아님).
+- 에이전트 환경: 커넥터 차단 `env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"}`를 `runner_agent.HARNESS_ENV`로 모든 실행에 적용한다. 이 값도 베이스라인 이후 바꾸지 않는다.
+
+## 도구 이름 형식과 종류 판정
+- jsonl에는 SDK가 부여한 이름을 그대로 저장한다. 실제 로그에서 확인한 형식: 커스텀 `mcp__t__<도구명>` (서버 키가 `t`), 내장은 `Read`, `Write`, `Edit`, `Glob`, `Grep` 그대로, 커넥터는 `mcp__claude_ai_<서비스>__<도구명>`.
+- 종류 판정은 `src/agent/tools.py`의 `classify_tool(name)` 한 곳만 쓴다: 접두사 `mcp__t__`이면 `custom`, 내장 5개 이름이면 `builtin`, 그 외는 `other`. `report.py`도 이 함수를 쓴다.
+
+## report.py 지표 정의 (구현: src/eval/report.py)
+- 커스텀 도구 선택률 = (overlap_with가 있는 과제에서, 그 과제의 overlap 쌍에 적힌 커스텀 도구를 한 번이라도 호출한 실행 수) / (그 과제들의 전체 실행 수). 쌍별 값(예: search_text 대 Grep)도 따로 계산하고 "커스텀만/내장만/둘 다/둘 다 아님" 건수를 병기한다. 쌍에 없는 커스텀 도구(예: check_result)의 사용은 선택률에 넣지 않는다.
+- 성공률 = 채점 통과 실행 수(success+통과, error_max_turns+통과) / 채점된 실행 수. 선택률과 별도 줄에 보고하고 합치지 않는다.
+- 성패 분류: (subtype, 채점) 5범주 + 채점이 없는 실행용 "채점 없음". 표본 크기 문구 `N=…, 과제당 M회 / 총 K건`은 `sample_label()`이 데이터에서 세어 만든다. 선택률 계산 실행이 30건 미만이면 "표본이 작아 해석에 주의"가 붙는다. 그래프 제목용은 `chart_title()`.
+- 과제 정의의 overlap_with는 `{"과제id": ["search_text|Grep", ...]}` 형식으로 `--overlap`에 전달한다(Day 4에서 과제 로더가 연결).
+
 ## 아직 미확인
 1. 매 실행 새로 생성되는 약 40k 캐시 블록의 정체와 재사용 불가 원인 (커넥터 도구 노출이 후보)
 2. utilization 노이즈의 원인, 그리고 utilization이 실제로 무엇의 비율인지 (토큰? 요청? 가중치?)

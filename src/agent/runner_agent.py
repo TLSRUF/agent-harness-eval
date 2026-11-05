@@ -66,8 +66,13 @@ class TrajectoryWriter:
         self._f.close()
 
 
+# 계정에 연결된 claude.ai 커넥터(Gmail 등)가 에이전트에 노출되지 않게 한다 (docs/sdk_notes.md 참고)
+HARNESS_ENV = {"ENABLE_CLAUDEAI_MCP_SERVERS": "false"}
+
+
 def build_options(cfg: HarnessConfig, workdir: Path) -> ClaudeAgentOptions:
     return ClaudeAgentOptions(
+        env=dict(HARNESS_ENV),
         model=cfg.model,
         cwd=str(workdir),
         max_turns=cfg.max_turns,
