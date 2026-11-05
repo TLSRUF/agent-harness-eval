@@ -6,6 +6,8 @@
 
 주 실험 모델은 claude-haiku-5-5이며, claude-sonnet-5-5는 비교용 부분 실행이다.
 
+이 하네스는 계정에 연결된 외부 커넥터가 에이전트에 로드되지 않도록 차단하며, 도구 목록이 허용 목록과 다르면 실행을 중단한다.
+
 ## 실행 방법
 1. Python 3.12, `py -3.12 -m venv .venv`, `pip install -r requirements.txt`
 2. 인증: `claude login` 또는 `ANTHROPIC_API_KEY` (둘 중 하나만)
