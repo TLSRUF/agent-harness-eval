@@ -140,6 +140,14 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 - 이 세션의 harness 실행 11회(약 $0.1 정가 환산)가 있는 동안 five_hour는 0.19(07:28) → 0.25(07:43) → 0.28(07:45)로 움직였다. 07:28~07:43의 15분 동안 harness 호출은 없었으므로 이 변화(+0.06)는 다른 사용(이 대화 자체 등)에서 왔다. **구독 전체 사용량이라 오염된다는 가정이 관찰로 뒷받침된다.**
 - 결론(관찰 범위 내): 과제 1개의 비용(약 $0.01)은 해상도(0.01)와 노이즈(±0.01) 이하라 **과제 단위 델타는 측정 불가**에 가깝다. 의미 있는 값은 수십 회 묶음의 합계 정도다. 러너는 시작/끝 스냅샷과 이벤트 전체를 기록하고(`summary.rate_limit_events`), 델타는 `ratelimit.delta()`로 사후 계산하되 참고값으로만 쓴다.
 
+## 커넥터 노출 확인 (2026-11-05, Haiku 호출 3회) — 위 "발견 1" 정정 포함
+- **정정**: 위 "발견 1"의 "tools 목록에 커넥터 약 60개"는 14회 실행 중 **첫 실행 1회**의 init 메시지에서만 나타났다(68개 도구, 서버 10개). 나머지 13회는 init에 우리 8개(커스텀 3 + 내장 5)와 서버 `t` 1개만 보였다. init의 `tools`는 에이전트가 보는 도구의 신뢰할 수 있는 목록이 아니다(문서: 캐시된 도구 목록을 가진 원격 서버는 첫 호출 때 연결되고 init에는 빠질 수 있음, tool search 기본 켜짐).
+- **접근성 확인**: init에 커넥터가 없던 실행에서 에이전트에게 `mcp__claude_ai_Claude_Docs__guide` 호출을 시켰더니 "unavailable"이 아니라 `Permission ... has been denied because Claude Code is running in don't ask mode`(is_error=True)로 거부됐다. 즉 커넥터 도구는 CLI에 등록되어 호출 시도까지 가능하고, `dontAsk`가 실행을 막고 있다. 호출이 실행된 적은 없다(검증 범위: 이 도구 1개).
+- **차단 방법(공식 문서 확인)**: 환경변수 `ENABLE_CLAUDEAI_MCP_SERVERS=false` ("has the same effect for the current shell session") 또는 설정 `disableClaudeAiConnectors: true`. SDK에서는 `ClaudeAgentOptions(env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"})`로 시험했다. 레포 설정에는 아직 적용하지 않았다(사용자 확인 대기).
+- **차단 효과(같은 데모 과제)**: 차단 전 13회는 캐시 생성 합계 약 41k 또는 약 75k(두 블록), 비용 $0.0085~$0.0165. 차단 후 2회는 합계 1,044/1,059 토큰, 비용 $0.0008/$0.0008, 요청별 create는 130~380 수준이며 큰 블록이 사라졌다. 따라서 **약 40k 블록과 그 중복 생성은 커넥터 노출 때문**이라는 가설이 강하게 지지된다(블록 내용을 직접 열어 확인한 것은 아님: 가설).
+- 위 "아직 미확인 1번"(큰 블록의 정체)은 가설 수준으로 좁혀졌다. 차단은 비용을 약 10~20배 줄이므로 Day 8 베이스라인 예상 비용과 한도 계획에 직접 영향이 있다.
+- 부수 관찰(표본 작음): 데모 과제에서 ERROR 검색 도구는 차단 전 13회 중 Grep 12회·search_text 1회… 단 이 집계의 `search_text`는 차단 후 실행 포함 여부에 따라 달라진다(차단 전 11회 Grep 11/11, 차단 후 2회는 search_text 1·Grep 1). 선택률 결론을 내기엔 부족하다.
+
 ## 아직 미확인
 1. 매 실행 새로 생성되는 약 40k 캐시 블록의 정체와 재사용 불가 원인 (커넥터 도구 노출이 후보)
 2. utilization 노이즈의 원인, 그리고 utilization이 실제로 무엇의 비율인지 (토큰? 요청? 가중치?)
