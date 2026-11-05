@@ -93,5 +93,14 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 - 이 검증은 훅+도구 내부 검사의 조합을 검증한 것이다. `dontAsk` 단독으로 cwd 밖 접근을 막는지는 따로 검증하지 않았다(훅이 항상 켜져 있으므로 필수 아님). 내장 도구의 경로 키는 `file_path`/`path`/`notebook_path`와 Glob의 `pattern`만 검사한다. SDK 업그레이드 시 `tests/test_sandbox_tools.py`와 `python -m src.agent.sandbox_live`를 다시 돌린다.
 - 한계: 내장 `Grep`의 `glob` 인자 등 다른 키는 검사하지 않는다. Bash는 켜지 않는다.
 
+## Day 3 실행으로 확인한 사항 (러너/로깅)
+- **max_turns 도달**: `max_turns=1`에서 `ResultMessage(subtype="error_max_turns", terminal_reason="max_turns", is_error=True)`가 먼저 오고, 그 뒤 `query()`가 `ResultError`("Reached maximum number of turns (1)", exit code 1)를 던진다. 두 가지가 모두 발생하므로 러너는 ResultMessage를 기록한 뒤 예외를 잡아 `exception`으로 남긴다. 분석 시 `subtype == "error_max_turns"`로 턴 제한 실패를 센다. `exception`만으로 크래시로 분류하면 안 된다.
+- **num_turns 계산**: `max_turns=1`인데 `num_turns=2`로 보고됐다(마지막 거부된 턴 포함으로 추정). 실험 C에서 턴 수 통계는 이 값을 그대로 쓰되 한계로 명시한다.
+- **메시지 종류**: 스트림에는 `RateLimitEvent`, `SystemMessage`(init), `AssistantMessage`, `UserMessage`(도구 결과), `ResultMessage`가 온다. 로그에는 전부 `_type`과 함께 저장한다.
+- **한도 감지(Day 7용)**: `RateLimitEvent.rate_limit_info`에 `status`("allowed" 등), `rate_limit_type`("five_hour"), `resets_at`, 그리고 `raw.unifiedWindows.five_hour.utilization` / `seven_day.utilization`(0~1)이 있다. 러너는 utilization이 임계값(예: 0.8)을 넘거나 status가 "allowed"가 아니면 멈추는 방식으로 설계할 수 있다.
+- **캐시**: 한 실행 안에서는 캐시가 재사용된다(5턴 실행: cache_create 약 43k, cache_read 약 171k). 실행 간 재사용은 관찰되지 않았다(같은 과제를 2회 연속 실행했는데 둘째도 cache_create 약 42k). 과제별 임시 폴더 경로가 프롬프트 앞부분에 들어가 접두사가 달라지는 것이 원인으로 의심되나 검증하지 않았다.
+- **비용 감**: 5턴 과제 1회 약 $0.010~0.011(정가 기준 추정). 40개 x 3회 베이스라인은 단순 곱으로 약 $1.3이나, 이것은 정가 환산이며 구독 한도 소모와는 다르다.
+
 ## 아직 미확인
-1. `max_turns` 도달 시 정확한 동작(예외 vs `error_max_turns` ResultMessage) — Day 3에서 확인
+1. 실행 간 캐시 재사용을 막는 원인(임시 폴더 경로?)과 회피 가능 여부
+2. 구독 한도(five_hour/seven_day) 대비 실제 소모량: 이번 3회 실행 전후 utilization 비교는 하지 않았다

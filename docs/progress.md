@@ -9,3 +9,8 @@
 - 한 일: 커스텀 도구 3개(search_text, file_stats, check_result), 샌드박스 경로 검사, 내장 도구 PreToolUse 훅, pytest 14개, Haiku 실검증.
 - 숫자: pytest 14/14 통과. 실검증 3개 시나리오(Haiku 호출 3회, 총 약 $0.02) 모두 차단, 유출 0건.
 - 다음 할 일: Day 3 호출 래퍼(config 전환), trajectory jsonl 로깅, max_turns 도달 동작 확인, 임의 과제 1개 완주.
+
+## Day 3 (2026-11-05)
+- 한 일: config 확장(프롬프트 버전, 허용 도구, 파일명용 약칭), runner_agent.py(임시 폴더, 샌드박스, trajectory jsonl, 예외 기록, grader 훅), pytest 6개 추가(총 20개), Haiku 3회 실행.
+- 숫자: 시연 과제 5턴, 성공, 약 $0.011/회. max_turns=1은 error_max_turns 결과 + ResultError 예외가 둘 다 발생. 캐시는 실행 내에서만 재사용, 실행 간 미재사용.
+- 다음 할 일: Day 4 과제 포맷(YAML/JSON), graders.py, 쉬운 과제 15개와 정답 풀이 스크립트.
