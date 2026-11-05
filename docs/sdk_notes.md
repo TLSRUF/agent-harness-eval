@@ -106,7 +106,7 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 ### 에이전트가 실제로 보는 도구 목록
 - 출처: 초기화 `SystemMessage.data["tools"]`는 도구 **이름만** 제공한다. 설명과 입력 스키마는 이 메시지에 없다.
 - **커스텀 도구**의 설명·스키마는 MCP `tools/list`로 확인했다 (아래 표). 내장 도구(Read, Grep 등)의 설명 전문과 스키마는 로그, SDK 패키지(`claude.exe` 번들), 확인한 문서 페이지에서 볼 수 없었다. 로그로 확인한 것은 호출 시 쓰인 인자 이름뿐이다 (Grep: `pattern`, `path`, `output_mode` / Write: `file_path`, `content`).
-- **발견 1 (중요)**: `tools` 목록에 우리 8개 외에 **claude.ai 커넥터 MCP 도구 약 60개**(Gmail, CoinGecko, Crypto.com, Claude Docs 등)가 포함된다. `mcp_servers`에도 `source: claudeai`로 연결되어 있다. `dontAsk`라서 호출은 거부되겠지만 모델에게 노출되고 컨텍스트를 차지한다. 이는 (a) "허용 도구를 명시적으로 제한" 원칙과 CLAUDE.local.md의 "크립토 관련 내용 제외" 방침에 어긋나고 (b) 실행당 약 40k 캐시 생성 토큰의 후보 원인이다(검증 전). 해결 후보: `strict_mcp_config=True`, `disallowed_tools`에 커넥터 접두사 지정 등. **러너는 아직 바꾸지 않았다. 사용자 결정 대기.**
+- **발견 1 (중요)**: `tools` 목록에 우리 8개 외에 **claude.ai 커넥터 MCP 도구 약 60개**(메일, 시세, 문서 등 외부 서비스 연동)가 포함된다. `mcp_servers`에도 `source: claudeai`로 연결되어 있다. `dontAsk`라서 호출은 거부되겠지만 모델에게 노출되고 컨텍스트를 차지한다. 이는 (a) "허용 도구를 명시적으로 제한" 원칙과 CLAUDE.local.md의 "크립토 관련 내용 제외" 방침에 어긋나고 (b) 실행당 약 40k 캐시 생성 토큰의 후보 원인이다(검증 전). 해결 후보: `strict_mcp_config=True`, `disallowed_tools`에 커넥터 접두사 지정 등. **러너는 아직 바꾸지 않았다. 사용자 결정 대기.**
 - **발견 2**: `{"query": str, "path": str}` 형태의 간단 스키마는 모든 항목을 `required`로 만든다. 설명은 "optionally"인데 `check_result`의 `contains`, `min_lines`, `search_text`의 `path`가 필수로 노출된다. 실제 로그에서 에이전트가 `min_lines: 1`을 채워 넣었다. 선택 항목을 쓰려면 JSON Schema dict로 `required`를 직접 지정해야 한다. 베이스라인 동결 전에 결정할 문제다.
 
 | 구분 | 이름 | 설명(현재 default) | 입력(JSON Schema, required) |
@@ -142,7 +142,7 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 
 ## 커넥터 노출 확인 (2026-11-05, Haiku 호출 3회) — 위 "발견 1" 정정 포함
 - **정정**: 위 "발견 1"의 "tools 목록에 커넥터 약 60개"는 14회 실행 중 **첫 실행 1회**의 init 메시지에서만 나타났다(68개 도구, 서버 10개). 나머지 13회는 init에 우리 8개(커스텀 3 + 내장 5)와 서버 `t` 1개만 보였다. init의 `tools`는 에이전트가 보는 도구의 신뢰할 수 있는 목록이 아니다(문서: 캐시된 도구 목록을 가진 원격 서버는 첫 호출 때 연결되고 init에는 빠질 수 있음, tool search 기본 켜짐).
-- **접근성 확인**: init에 커넥터가 없던 실행에서 에이전트에게 `mcp__claude_ai_Claude_Docs__guide` 호출을 시켰더니 "unavailable"이 아니라 `Permission ... has been denied because Claude Code is running in don't ask mode`(is_error=True)로 거부됐다. 즉 커넥터 도구는 CLI에 등록되어 호출 시도까지 가능하고, `dontAsk`가 실행을 막고 있다. 호출이 실행된 적은 없다(검증 범위: 이 도구 1개).
+- **접근성 확인**: init에 커넥터가 없던 실행에서 에이전트에게 읽기 전용 커넥터 도구 1개(`mcp__claude_ai_<서비스>__<도구>` 형식)의 호출을 시켰더니 "unavailable"이 아니라 `Permission ... has been denied because Claude Code is running in don't ask mode`(is_error=True)로 거부됐다. 즉 커넥터 도구는 CLI에 등록되어 호출 시도까지 가능하고, `dontAsk`가 실행을 막고 있다. 호출이 실행된 적은 없다(검증 범위: 이 도구 1개).
 - **차단 방법(공식 문서 확인)**: 환경변수 `ENABLE_CLAUDEAI_MCP_SERVERS=false` ("has the same effect for the current shell session") 또는 설정 `disableClaudeAiConnectors: true`. SDK에서는 `ClaudeAgentOptions(env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"})`로 시험했다. 레포 설정에는 아직 적용하지 않았다(사용자 확인 대기).
 - **차단 효과(같은 데모 과제)**: 차단 전 13회는 캐시 생성 합계 약 41k 또는 약 75k(두 블록), 비용 $0.0085~$0.0165. 차단 후 2회는 합계 1,044/1,059 토큰, 비용 $0.0008/$0.0008, 요청별 create는 130~380 수준이며 큰 블록이 사라졌다. 따라서 **약 40k 블록과 그 중복 생성은 커넥터 노출 때문**이라는 가설이 강하게 지지된다(블록 내용을 직접 열어 확인한 것은 아님: 가설).
 - 위 "아직 미확인 1번"(큰 블록의 정체)은 가설 수준으로 좁혀졌다. 차단은 비용을 약 10~20배 줄이므로 Day 8 베이스라인 예상 비용과 한도 계획에 직접 영향이 있다.

@@ -54,9 +54,9 @@ def test_no_warning_at_30(tmp_path):
 
 
 def test_tool_table_and_errors(tmp_path):
-    r = write_run(tmp_path / "a.jsonl", "t1", ["mcp__t__check_result", "Read", "Read", "mcp__claude_ai_Gmail__x"], errors=1)
+    r = write_run(tmp_path / "a.jsonl", "t1", ["mcp__t__check_result", "Read", "Read", "mcp__claude_ai_Example__x"], errors=1)
     rep = build_report([r], {})
-    assert "check_result 1 | Read 2 | mcp__claude_ai_Gmail__x 1" in rep
+    assert "check_result 1 | Read 2 | mcp__claude_ai_Example__x 1" in rep
     assert "도구 오류율: 1/4 = 25.0%" in rep
     assert "선택률 n/a (N=0, 과제당 0회 / 총 0건)" in rep
 
