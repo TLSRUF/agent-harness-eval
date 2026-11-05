@@ -146,7 +146,7 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 - **차단 방법(공식 문서 확인)**: 환경변수 `ENABLE_CLAUDEAI_MCP_SERVERS=false` ("has the same effect for the current shell session") 또는 설정 `disableClaudeAiConnectors: true`. SDK에서는 `ClaudeAgentOptions(env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"})`로 시험했다. 레포 설정에는 아직 적용하지 않았다(사용자 확인 대기).
 - **차단 효과(같은 데모 과제)**: 차단 전 13회는 캐시 생성 합계 약 41k 또는 약 75k(두 블록), 비용 $0.0085~$0.0165. 차단 후 2회는 합계 1,044/1,059 토큰, 비용 $0.0008/$0.0008, 요청별 create는 130~380 수준이며 큰 블록이 사라졌다. 따라서 **약 40k 블록과 그 중복 생성은 커넥터 노출 때문**이라는 가설이 강하게 지지된다(블록 내용을 직접 열어 확인한 것은 아님: 가설).
 - 위 "아직 미확인 1번"(큰 블록의 정체)은 가설 수준으로 좁혀졌다. 차단은 비용을 약 10~20배 줄이므로 Day 8 베이스라인 예상 비용과 한도 계획에 직접 영향이 있다.
-- 부수 관찰(표본 작음): 데모 과제에서 ERROR 검색 도구는 차단 전 13회 중 Grep 12회·search_text 1회… 단 이 집계의 `search_text`는 차단 후 실행 포함 여부에 따라 달라진다(차단 전 11회 Grep 11/11, 차단 후 2회는 search_text 1·Grep 1). 선택률 결론을 내기엔 부족하다.
+- 부수 관찰(표본 작음): 데모 과제의 ERROR 검색 도구 선택은 차단 전 11회 모두 Grep(11/11), 차단 후 2회는 search_text 1회·Grep 1회였다. 차단이 선택에 영향을 주는지는 이 표본(N=1개 과제, 2회)으로는 알 수 없다.
 
 ## 아직 미확인
 1. 매 실행 새로 생성되는 약 40k 캐시 블록의 정체와 재사용 불가 원인 (커넥터 도구 노출이 후보)
