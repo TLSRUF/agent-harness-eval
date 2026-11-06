@@ -1,0 +1,20 @@
+{
+  "id": "E13",
+  "slug": "warn-lines-copy",
+  "rev": 1,
+  "difficulty": "easy",
+  "prompt": "작업 폴더의 app.log에는 서버 로그가 들어 있어. 대문자 WARN이 든 줄을 원래 순서 그대로, 한 줄에 하나씩 warn.txt에 저장해줘. 줄 내용은 고치지 말고 그대로 복사해.",
+  "fixture": "E13",
+  "format_hint": "대문자 WARN이 든 줄을 원래 순서 그대로, 한 줄에 하나씩",
+  "outputs": [
+    "warn.txt"
+  ],
+  "grading": {
+    "grader": "custom:grade_E13",
+    "allowed": "줄 순서와 내용은 정확히 일치, 끝 줄바꿈과 \\r\\n/\\n 차이만 허용"
+  },
+  "overlap_with": [
+    "search_text|Grep"
+  ],
+  "hand_check": "app.log 50줄. WARN이 든 줄은 4, 9, 15, 22, 27, 33, 41, 47번째 줄(8개). 나머지 42줄은 INFO 25 + DEBUG 12 + ERROR 5. WARNING, 소문자 warn, 다른 줄 본문 속 WARN 글자는 없다. 정답은 이 8줄을 줄 번호 순서 그대로 한 글자도 바꾸지 않고 복사한 것."
+}

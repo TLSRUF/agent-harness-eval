@@ -1,0 +1,30 @@
+{
+  "id": "E10",
+  "slug": "compare-word-counts",
+  "rev": 1,
+  "difficulty": "easy",
+  "prompt": "draft1.txt와 draft2.txt 중 단어 수가 더 많은 파일을 찾아서, more.txt에 `더 긴 파일: <파일명>` 형식으로 한 줄만 저장해줘. 단어는 공백으로 구분되는 덩어리야.",
+  "fixture": "E10",
+  "format_hint": "더 긴 파일: <파일명>",
+  "outputs": [
+    "more.txt"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "more.txt",
+      "expected_text": "더 긴 파일: draft2.txt",
+      "value_tokens": [
+        "draft2.txt"
+      ],
+      "forbid_tokens": [
+        "draft1.txt"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "file_stats|Read"
+  ],
+  "hand_check": "draft1.txt: 6(the cat sat on the mat) + 3(it was warm) = 9단어. draft2.txt: 4(a small dog ran) + 4(across the green field) + 4(and then it slept) = 12단어. 12 > 9이므로 draft2.txt."
+}

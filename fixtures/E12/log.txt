@@ -1,0 +1,7 @@
+BEGIN session
+user logged in
+page viewed
+button clicked
+form submitted
+user logged out
+END session

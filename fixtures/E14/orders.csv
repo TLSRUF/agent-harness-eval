@@ -1,0 +1,13 @@
+order_id,product,price,qty,region
+o101,pencil,300,12,east
+o102,eraser,150,8,west
+o103,ruler,500,23,east
+o104,marker,900,31,north
+o105,notebook,2500,17,west
+o106,scissors,1800,50,south
+o107,tape,700,44,east
+o108,glue,400,29,north
+o109,folder,350,36,west
+o110,stapler,1200,9,south
+o111,clip,100,41,east
+o112,binder,2100,25,north

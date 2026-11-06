@@ -1,0 +1,27 @@
+{
+  "id": "E01",
+  "slug": "count-error-lines",
+  "rev": 1,
+  "difficulty": "easy",
+  "prompt": "작업 폴더의 app.log에는 서버 로그가 들어 있어. 대문자 ERROR가 들어 있는 줄이 모두 몇 줄인지 세어서, result.txt 파일에 `ERROR 줄 수: <숫자>` 형식으로 한 줄만 저장해줘.",
+  "fixture": "E01",
+  "format_hint": "ERROR 줄 수: <숫자>",
+  "outputs": [
+    "result.txt"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "result.txt",
+      "expected_text": "ERROR 줄 수: 4",
+      "value_tokens": [
+        "4"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "search_text|Grep"
+  ],
+  "hand_check": "app.log는 13줄. ERROR가 있는 줄은 4번째(disk full), 6번째(write failed), 9번째(timeout contacting db), 12번째(db connection refused) = 4줄. WARN/INFO 줄에는 ERROR가 없다."
+}

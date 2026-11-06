@@ -1,0 +1,33 @@
+{
+  "id": "E02",
+  "slug": "find-file-with-word",
+  "rev": 1,
+  "difficulty": "easy",
+  "prompt": "작업 폴더에 a.txt부터 e.txt까지 다섯 개의 메모 파일이 있어. 그중 'kiwi'라는 단어가 들어 있는 파일은 하나뿐이야. 그 파일의 이름을 answer.txt에 `파일: <파일명>` 형식으로 한 줄만 저장해줘.",
+  "fixture": "E02",
+  "format_hint": "파일: <파일명>",
+  "outputs": [
+    "answer.txt"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "answer.txt",
+      "expected_text": "파일: c.txt",
+      "value_tokens": [
+        "c.txt"
+      ],
+      "forbid_tokens": [
+        "a.txt",
+        "b.txt",
+        "d.txt",
+        "e.txt"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "search_text|Grep"
+  ],
+  "hand_check": "다섯 파일 각 3줄. kiwi는 c.txt의 2번째 줄(apple, kiwi, and grape)에만 있다. a/b/d/e에는 없다."
+}
