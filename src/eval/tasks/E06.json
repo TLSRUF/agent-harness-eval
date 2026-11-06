@@ -1,0 +1,25 @@
+{
+  "id": "E06",
+  "slug": "sum-csv-column",
+  "rev": 1,
+  "difficulty": "easy",
+  "prompt": "sales.csv의 qty 열 값을 모두 더해서 total.txt에 `합계: <숫자>` 형식으로 한 줄만 저장해줘.",
+  "fixture": "E06",
+  "format_hint": "합계: <숫자>",
+  "outputs": [
+    "total.txt"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "total.txt",
+      "expected_text": "합계: 20",
+      "value_tokens": [
+        "20"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [],
+  "hand_check": "qty 값 3(pen) + 5(book) + 2(cup) + 4(bag) + 6(hat) = 20. 헤더 줄 제외 5개 행."
+}

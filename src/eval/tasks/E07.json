@@ -1,0 +1,32 @@
+{
+  "id": "E07",
+  "slug": "list-txt-files",
+  "rev": 1,
+  "difficulty": "easy",
+  "prompt": "작업 폴더에서 확장자가 .txt인 파일의 이름만 모아 txt_files.list에 저장해줘. 형식: <파일명> (한 줄에 하나, 알파벳 순)",
+  "fixture": "E07",
+  "format_hint": "<파일명> (한 줄에 하나, 알파벳 순)",
+  "outputs": [
+    "txt_files.list"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "txt_files.list",
+      "expected_text": "a.txt\nc.txt\ne.txt",
+      "value_tokens": [
+        "a.txt",
+        "c.txt",
+        "e.txt"
+      ],
+      "forbid_tokens": [
+        "b.log",
+        "d.md",
+        "f.log"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 파일명은 엄격 일치이고 줄 순서도 엄격(순서가 틀리면 format_error)."
+  },
+  "overlap_with": [],
+  "hand_check": "폴더에 파일 6개: a.txt, b.log, c.txt, d.md, e.txt, f.log. .txt는 a.txt, c.txt, e.txt 3개, 알파벳 순 그대로."
+}

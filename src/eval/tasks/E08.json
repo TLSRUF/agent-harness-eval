@@ -1,0 +1,27 @@
+{
+  "id": "E08",
+  "slug": "find-line-number",
+  "rev": 1,
+  "difficulty": "easy",
+  "prompt": "notes.txt에서 TODO가 들어 있는 줄이 몇 번째 줄인지 찾아 line.txt에 `줄 번호: <숫자>` 형식으로 한 줄만 저장해줘. 첫 줄이 1번이야.",
+  "fixture": "E08",
+  "format_hint": "줄 번호: <숫자>",
+  "outputs": [
+    "line.txt"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "line.txt",
+      "expected_text": "줄 번호: 7",
+      "value_tokens": [
+        "7"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "search_text|Grep"
+  ],
+  "hand_check": "notes.txt 10줄: 1 meeting notes / 2 review budget / 3 book room / 4 call vendor / 5 update slides / 6 send invites / 7 TODO: confirm headcount / 8 archive old files / 9 reply to emails / 10 plan next week. TODO는 7번째 줄 하나뿐."
+}

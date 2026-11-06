@@ -1,0 +1,26 @@
+{
+  "id": "E11",
+  "slug": "create-greeting-file",
+  "rev": 1,
+  "difficulty": "easy",
+  "prompt": "greeting.txt 파일을 새로 만들고, 내용을 `안녕하세요, 하네스!` 한 줄로 채워줘.",
+  "fixture": "E11",
+  "format_hint": "안녕하세요, 하네스!",
+  "outputs": [
+    "greeting.txt"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "greeting.txt",
+      "expected_text": "안녕하세요, 하네스!",
+      "value_tokens": [
+        "안녕하세요",
+        "하네스"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [],
+  "hand_check": "새 파일 greeting.txt의 내용이 정확히 `안녕하세요, 하네스!` 한 줄(쉼표 뒤 공백 하나, 느낌표로 끝)."
+}

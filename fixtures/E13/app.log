@@ -1,0 +1,50 @@
+2026-04-12 08:00:54 [INFO] scheduler started with 4 workers
+2026-04-12 08:01:49 [DEBUG] loading job definitions from jobs.yaml
+2026-04-12 08:02:45 [INFO] job nightly-export queued
+2026-04-12 08:03:42 [WARN] queue depth at 80 percent of limit
+2026-04-12 08:04:40 [DEBUG] worker 1 picked job nightly-export
+2026-04-12 08:05:39 [ERROR] export target unreachable, will retry
+2026-04-12 08:06:32 [INFO] retry 1 scheduled in 30 seconds
+2026-04-12 08:07:26 [DEBUG] heartbeat from worker 2
+2026-04-12 08:08:21 [WARN] retry delay exceeds configured soft limit
+2026-04-12 08:09:17 [INFO] job nightly-export completed
+2026-04-12 08:10:14 [DEBUG] heartbeat from worker 3
+2026-04-12 08:11:12 [INFO] job cleanup-temp queued
+2026-04-12 08:12:11 [DEBUG] worker 4 picked job cleanup-temp
+2026-04-12 08:13:04 [INFO] cleanup-temp removed 120 files
+2026-04-12 08:13:58 [WARN] disk usage on /var/tmp reached 92%
+2026-04-12 08:14:53 [INFO] job cleanup-temp completed
+2026-04-12 08:15:49 [DEBUG] heartbeat from worker 1
+2026-04-12 08:16:46 [ERROR] failed to write metrics snapshot
+2026-04-12 08:17:44 [INFO] metrics snapshot retried successfully
+2026-04-12 08:18:43 [DEBUG] heartbeat from worker 2
+2026-04-12 08:19:36 [INFO] job report-weekly queued
+2026-04-12 08:20:30 [WARN] report-weekly input file is older than 7 days
+2026-04-12 08:21:25 [INFO] worker 3 picked job report-weekly
+2026-04-12 08:22:21 [DEBUG] parsing 3400 input rows
+2026-04-12 08:23:18 [INFO] report-weekly generated 12 pages
+2026-04-12 08:24:16 [INFO] job report-weekly completed
+2026-04-12 08:25:15 [WARN] email gateway latency above 2000 ms
+2026-04-12 08:26:08 [INFO] report-weekly delivered to 5 recipients
+2026-04-12 08:27:02 [DEBUG] heartbeat from worker 4
+2026-04-12 08:27:57 [ERROR] recipient list contains an invalid address
+2026-04-12 08:28:53 [INFO] invalid address skipped
+2026-04-12 08:29:50 [INFO] job archive-old queued
+2026-04-12 08:30:48 [WARN] archive volume is 85% full
+2026-04-12 08:31:47 [INFO] worker 2 picked job archive-old
+2026-04-12 08:32:40 [DEBUG] compressing 18 files
+2026-04-12 08:33:34 [INFO] archive-old wrote archive-2026-04.tar
+2026-04-12 08:34:29 [INFO] job archive-old completed
+2026-04-12 08:35:25 [ERROR] checksum mismatch on archive-2026-04.tar
+2026-04-12 08:36:22 [INFO] archive-old rerun requested
+2026-04-12 08:37:20 [DEBUG] heartbeat from worker 1
+2026-04-12 08:38:19 [WARN] second archive attempt is slower than the first
+2026-04-12 08:39:12 [INFO] checksum verified for archive-2026-04.tar
+2026-04-12 08:40:06 [INFO] job archive-old completed on retry
+2026-04-12 08:41:01 [ERROR] notification service returned status 503
+2026-04-12 08:41:57 [DEBUG] heartbeat from worker 3
+2026-04-12 08:42:54 [INFO] notification queued for later delivery
+2026-04-12 08:43:52 [WARN] pending notifications exceed 10 entries
+2026-04-12 08:44:51 [INFO] scheduler idle, 0 jobs waiting
+2026-04-12 08:45:44 [INFO] worker pool draining
+2026-04-12 08:46:38 [INFO] scheduler stopped

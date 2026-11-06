@@ -1,0 +1,26 @@
+{
+  "id": "E12",
+  "slug": "first-and-last-line",
+  "rev": 1,
+  "difficulty": "easy",
+  "prompt": "log.txt의 첫 줄과 마지막 줄을 그대로 복사해서 first_last.txt에 저장해줘. 형식: 첫 줄과 마지막 줄을 한 줄씩",
+  "fixture": "E12",
+  "format_hint": "첫 줄과 마지막 줄을 한 줄씩",
+  "outputs": [
+    "first_last.txt"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "first_last.txt",
+      "expected_text": "BEGIN session\nEND session",
+      "value_tokens": [
+        "BEGIN session",
+        "END session"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 파일명은 엄격 일치이고 줄 순서도 엄격(순서가 틀리면 format_error)."
+  },
+  "overlap_with": [],
+  "hand_check": "log.txt 7줄: 1 BEGIN session / 2 user logged in / 3 page viewed / 4 button clicked / 5 form submitted / 6 user logged out / 7 END session. 첫 줄 BEGIN session, 마지막 줄 END session."
+}
