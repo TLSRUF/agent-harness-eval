@@ -22,5 +22,7 @@
     "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 파일명은 엄격 일치이고 줄 순서도 엄격(순서가 틀리면 format_error)."
   },
   "overlap_with": [],
-  "hand_check": "log.txt 7줄: 1 BEGIN session / 2 user logged in / 3 page viewed / 4 button clicked / 5 form submitted / 6 user logged out / 7 END session. 첫 줄 BEGIN session, 마지막 줄 END session."
+  "hand_check": "log.txt 7줄: 1 BEGIN session / 2 user logged in / 3 page viewed / 4 button clicked / 5 form submitted / 6 user logged out / 7 END session. 첫 줄 BEGIN session, 마지막 줄 END session.",
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1"
 }

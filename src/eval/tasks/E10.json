@@ -26,5 +26,7 @@
   "overlap_with": [
     "file_stats|Read"
   ],
-  "hand_check": "draft1.txt: 6(the cat sat on the mat) + 3(it was warm) = 9단어. draft2.txt: 4(a small dog ran) + 4(across the green field) + 4(and then it slept) = 12단어. 12 > 9이므로 draft2.txt."
+  "hand_check": "draft1.txt: 6(the cat sat on the mat) + 3(it was warm) = 9단어. draft2.txt: 4(a small dog ran) + 4(across the green field) + 4(and then it slept) = 12단어. 12 > 9이므로 draft2.txt.",
+  "min_steps": 3,
+  "min_steps_basis": "통계 2(파일 2개) + 쓰기 1"
 }

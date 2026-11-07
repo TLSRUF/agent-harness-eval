@@ -21,5 +21,7 @@
     "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
   },
   "overlap_with": [],
-  "hand_check": "server.conf 6줄 중 3번째 줄 `port = 8080`. 다른 숫자(timeout 30, workers 4)는 포트가 아니다."
+  "hand_check": "server.conf 6줄 중 3번째 줄 `port = 8080`. 다른 숫자(timeout 30, workers 4)는 포트가 아니다.",
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1"
 }

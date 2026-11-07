@@ -31,5 +31,7 @@
   "hand_check": "orders.log는 350줄이고 E4021은 [112, 153, 158, 166]번째 줄에 나오며 처음은 112번째 줄. 사람이 열어서 확인할 표본: [112번째 줄 `2026-05-04 08:09:45 order-svc ERROR order=4000347 code=E4021 order rejected`] (처음), [111번째 줄 `2026-05-04 08:09:42 order-svc INFO order=4000346 code=S2000 shipment queued`] (그 바로 앞 줄에는 E4021 없음), [153번째 줄 `2026-05-04 08:13:29 order-svc ERROR order=4000472 code=E4021 order rejected`] (두 번째 등장). 한 글자만 다른 별개 코드도 있다: E4020 [29번째 줄 `2026-05-04 08:02:30 order-svc ERROR order=4000082 code=E4020 order rejected`], E4022 [10번째 줄 `2026-05-04 08:00:47 order-svc ERROR order=4000023 code=E4022 carrier unavailable`]. E4021로 시작하거나 끝나는 더 긴 코드는 없다.",
   "answer": {
     "line": 112
-  }
+  },
+  "min_steps": 2,
+  "min_steps_basis": "검색 1(줄 번호 포함) + 쓰기 1"
 }

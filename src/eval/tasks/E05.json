@@ -22,5 +22,7 @@
     "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. debug 줄 값은 엄격, 나머지 줄은 한 글자도 바뀌면 안 됨(바뀌면 unexpected_change)."
   },
   "overlap_with": [],
-  "hand_check": "6줄 중 3번째 줄만 `debug = false`→`debug = true`. 5번째 줄 retries=3, 6번째 줄 verbose = false(다른 false 값)는 그대로여야 한다."
+  "hand_check": "6줄 중 3번째 줄만 `debug = false`→`debug = true`. 5번째 줄 retries=3, 6번째 줄 verbose = false(다른 false 값)는 그대로여야 한다.",
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1(수정한 전체 내용)"
 }

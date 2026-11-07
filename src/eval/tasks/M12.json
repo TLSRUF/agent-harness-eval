@@ -32,5 +32,7 @@
       "qa: 5",
       "sales: 3"
     ]
-  }
+  },
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1"
 }

@@ -26,5 +26,7 @@
     "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 대상 줄의 값은 엄격, 나머지 줄은 한 글자도 바뀌면 안 됨(바뀌면 unexpected_change)."
   },
   "overlap_with": [],
-  "hand_check": "service.ini는 14줄. 4번째 줄 `timeout = 30`만 `timeout = 60`으로, 7번째 줄 `retries = 3`만 `retries = 5`로 바뀐다. 같은 값을 가진 다른 키 8번째 줄 `backoff = 3`과 9번째 줄 `idle = 30`은 그대로여야 한다(바꾸면 unexpected_change). timeout/retries로 시작하는 다른 키는 없다."
+  "hand_check": "service.ini는 14줄. 4번째 줄 `timeout = 30`만 `timeout = 60`으로, 7번째 줄 `retries = 3`만 `retries = 5`로 바뀐다. 같은 값을 가진 다른 키 8번째 줄 `backoff = 3`과 9번째 줄 `idle = 30`은 그대로여야 한다(바꾸면 unexpected_change). timeout/retries로 시작하는 다른 키는 없다.",
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1(수정한 전체 내용)"
 }

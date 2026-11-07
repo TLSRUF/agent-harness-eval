@@ -43,5 +43,7 @@
     ]
   },
   "overlap_with": [],
-  "hand_check": "scores.csv는 헤더 `name,score` + 5행. 정답 scores.json은 같은 순서의 객체 5개이고 score는 따옴표로 감싼 문자열: 한지우=91 / 오세민=67 / 송하늘=100 / 윤재이=78 / 강나래=85. 점수 100처럼 세 자리 수도 문자열이다."
+  "hand_check": "scores.csv는 헤더 `name,score` + 5행. 정답 scores.json은 같은 순서의 객체 5개이고 score는 따옴표로 감싼 문자열: 한지우=91 / 오세민=67 / 송하늘=100 / 윤재이=78 / 강나래=85. 점수 100처럼 세 자리 수도 문자열이다.",
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1"
 }

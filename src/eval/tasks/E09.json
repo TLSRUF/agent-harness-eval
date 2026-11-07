@@ -25,5 +25,7 @@
     "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 파일명은 엄격 일치이고 줄 순서도 엄격(순서가 틀리면 format_error)."
   },
   "overlap_with": [],
-  "hand_check": "입력 순서 mina, alex, zoe, bob, chris(5개) → 알파벳 순 alex, bob, chris, mina, zoe. 모두 소문자."
+  "hand_check": "입력 순서 mina, alex, zoe, bob, chris(5개) → 알파벳 순 alex, bob, chris, mina, zoe. 모두 소문자.",
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1"
 }

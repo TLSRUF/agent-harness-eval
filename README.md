@@ -13,6 +13,10 @@
 2. 인증: `claude login` 또는 `ANTHROPIC_API_KEY` (둘 중 하나만)
 3. `python -m src.agent.smoke`
 
+## 한계
+
+- `file_stats` 도구는 `str.splitlines()`를 써서 낱개 CR, U+2028 등도 줄바꿈으로 세며, 평가 fixture에는 이런 문자가 없다.
+
 ## 기여 안내 / Contributions
 
 현재 개발 중이라 외부 기여(PR, 이슈)는 받지 않습니다. 정리가 끝나면 다시 안내합니다.

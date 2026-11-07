@@ -24,5 +24,7 @@
   "overlap_with": [
     "file_stats|Read"
   ],
-  "hand_check": "줄별 단어 수: 4(the quick brown fox) + 5(jumps over the lazy dog) + 3(a b c) + 4(one two three four) + 1(five) + 2(six seven) = 19. 줄 수 6."
+  "hand_check": "줄별 단어 수: 4(the quick brown fox) + 5(jumps over the lazy dog) + 3(a b c) + 4(one two three four) + 1(five) + 2(six seven) = 19. 줄 수 6.",
+  "min_steps": 2,
+  "min_steps_basis": "통계 1(줄/단어 수) + 쓰기 1"
 }

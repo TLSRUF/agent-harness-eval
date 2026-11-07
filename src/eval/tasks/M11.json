@@ -24,5 +24,7 @@
   "hand_check": "orders.csv는 헤더 + 14행. region이 east인 데이터 행(번호, qty): [(4, '2'), (6, '8'), (8, '6'), (11, '8'), (13, '3')] -> 합 27. 다른 지역(west, north, south)은 합에 넣지 않는다.",
   "answer": {
     "sum": 27
-  }
+  },
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1"
 }

@@ -23,5 +23,7 @@
   "overlap_with": [
     "search_text|Grep"
   ],
-  "hand_check": "notes.txt 10줄: 1 meeting notes / 2 review budget / 3 book room / 4 call vendor / 5 update slides / 6 send invites / 7 TODO: confirm headcount / 8 archive old files / 9 reply to emails / 10 plan next week. TODO는 7번째 줄 하나뿐."
+  "hand_check": "notes.txt 10줄: 1 meeting notes / 2 review budget / 3 book room / 4 call vendor / 5 update slides / 6 send invites / 7 TODO: confirm headcount / 8 archive old files / 9 reply to emails / 10 plan next week. TODO는 7번째 줄 하나뿐.",
+  "min_steps": 2,
+  "min_steps_basis": "검색 1(줄 번호 포함) + 쓰기 1"
 }

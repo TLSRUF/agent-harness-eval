@@ -17,5 +17,7 @@
     ]
   },
   "overlap_with": [],
-  "hand_check": "orders.csv는 헤더 + 12행. qty는 순서대로 12, 8, 23, 31, 17, 50, 44, 29, 36, 9, 41, 25. 최댓값 50은 하나뿐이고 6번째 데이터 행(o106, scissors). 함정: price 최댓값은 notebook(2500)이며 qty가 아니다."
+  "hand_check": "orders.csv는 헤더 + 12행. qty는 순서대로 12, 8, 23, 31, 17, 50, 44, 29, 36, 9, 41, 25. 최댓값 50은 하나뿐이고 6번째 데이터 행(o106, scissors). 함정: price 최댓값은 notebook(2500)이며 qty가 아니다.",
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1"
 }

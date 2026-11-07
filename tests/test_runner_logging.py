@@ -77,7 +77,7 @@ def test_run_task_logs_and_counts(tmp_path, monkeypatch):
     assert s["tool_calls"] == 1 and s["tool_errors"] == 1 and s["num_turns"] == 2
     assert s["graded"] == {"passed": True} and seen["files"] == ["a.txt"]
     lines = [json.loads(x) for x in log.read_text(encoding="utf-8").splitlines()]
-    assert [r["kind"] for r in lines] == ["config", "message", "message", "message", "grade", "summary"]
+    assert [r["kind"] for r in lines] == ["config", "message", "message", "message", "grade", "snapshot", "summary"]  # 스냅샷 이벤트는 채점 직후, 요약 직전
     assert lines[0]["config"]["model"] == "claude-haiku-5-5" and lines[0]["config"]["max_turns"] == 20
     assert lines[-1]["total_cost_usd"] == 0.01 and lines[-1]["usage"]["output_tokens"] == 2
 
