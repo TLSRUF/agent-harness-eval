@@ -1,0 +1,39 @@
+{
+  "id": "H08",
+  "seed": 20261125,
+  "answer": {
+    "file": "note_06.txt",
+    "bytes": 5016
+  },
+  "planted": {
+    "bytes_per_file": {
+      "note_01.txt": 4992,
+      "note_02.txt": 2900,
+      "note_03.txt": 3150,
+      "note_04.txt": 4380,
+      "note_05.txt": 1800,
+      "note_06.txt": 5016,
+      "note_07.txt": 3900,
+      "note_08.txt": 2640,
+      "note_09.txt": 3360,
+      "note_10.txt": 5016
+    },
+    "chars_per_file": {
+      "note_01.txt": 2006,
+      "note_02.txt": 2900,
+      "note_03.txt": 1264,
+      "note_04.txt": 1764,
+      "note_05.txt": 704,
+      "note_06.txt": 2004,
+      "note_07.txt": 1582,
+      "note_08.txt": 1048,
+      "note_09.txt": 3360,
+      "note_10.txt": 1984
+    },
+    "tied_files": [
+      "note_06.txt",
+      "note_10.txt"
+    ],
+    "char_max_file": "note_09.txt"
+  }
+}

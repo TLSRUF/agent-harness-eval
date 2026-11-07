@@ -280,10 +280,67 @@ def grade_list_file(workdir: Path, params: dict, fixture_dir: Path, outputs: lis
     return make_result("format_error", f"same items but layout/order differs: {normalize_lines(text)!r}")
 
 
+def _spacing_only_diff(actual: str, expected: str) -> bool:
+    """공백을 모두 지우면 같은 줄인가 (예: 'endpoint=x' 대 'endpoint = x')."""
+    return re.sub(r"\s+", "", actual) == re.sub(r"\s+", "", expected)
+
+
+def _annotated(actual: str, expected: str) -> bool:
+    """기대한 줄 뒤에 공백이나 비ASCII(한국어 등)로 시작하는 덧붙임만 있는가 (설명, 줄 끝 주석).
+    값 자체가 달라지는 덧붙임(예: ':9090/health', ':90900', ':9090.5')은 해당하지 않는다."""
+    if actual == expected or not actual.startswith(expected):
+        return False
+    nxt = actual[len(expected)]
+    return nxt.isspace() or ord(nxt) > 127
+
+
+def grade_multi_edit_file(workdir: Path, params: dict, fixture_dir: Path, outputs: list[str]) -> dict:
+    """여러 파일을 줄 단위로 고치는 과제: 바꿔야 할 줄만 정확히 바뀌고 나머지 줄(디코이 포함)은 그대로인지.
+
+    params: files(고칠 파일 경로 목록, 바꿀 줄이 없는 파일도 포함), expected({경로: 수정 후 전체 내용})
+    원본은 fixture에서 읽는다. 원본과 expected는 줄 수가 같아야 하고, 줄 번호를 기준으로 비교한다.
+    - 원본과 expected가 같은 줄(그대로여야 함)이 바뀌면, 줄 수가 달라지면, files에 없는 fixture 파일이 바뀌면 unexpected_change
+    - 바꿔야 할 줄이 안 바뀌었거나 다르게 바뀌면 wrong_value (공백만 다르거나 뒤에 설명이 붙었으면 format_error)
+    - 파일이 하나라도 없거나 비어 있으면 missing_output
+    여러 파일의 판정은 missing_output > unexpected_change > wrong_value > format_error > pass 순으로 가장 심한 것을 따른다.
+    """
+    missing: list[str] = []
+    unexpected: list[str] = []
+    wrong: list[str] = []
+    fmt: list[str] = []
+    for rel in params["files"]:
+        p, err = _output_state(workdir, rel)
+        if err:
+            missing.append(err)
+            continue
+        orig = normalize_lines(read_text(Path(fixture_dir) / rel))
+        exp = normalize_lines(params["expected"][rel])
+        act = normalize_lines(read_text(p))
+        if len(exp) != len(orig):
+            raise ValueError(f"expected and original differ in line count for {rel}")
+        if len(act) != len(orig):
+            unexpected.append(f"{rel}: line count {len(act)} != {len(orig)}")
+            continue
+        for i, (o, e, a) in enumerate(zip(orig, exp, act), 1):
+            if e == o:
+                if a != o:
+                    unexpected.append(f"{rel}:{i} line that must stay was changed: {a!r}")
+            elif a != e:
+                (fmt if _spacing_only_diff(a, e) or _annotated(a, e) else wrong).append(f"{rel}:{i} got {a!r}, expected {e!r}")
+    protected = changed_protected_files(workdir, fixture_dir, outputs)
+    if protected:
+        unexpected.append(f"protected files changed: {protected}")
+    for ft, items in (("missing_output", missing), ("unexpected_change", unexpected), ("wrong_value", wrong), ("format_error", fmt)):
+        if items:
+            return make_result(ft, "; ".join(items[:6]) + (f" (+{len(items) - 6} more)" if len(items) > 6 else ""))
+    return make_result("pass")
+
+
 GRADERS: dict[str, Callable[[Path, dict, Path, list[str]], dict]] = {
     "text_file": grade_text_file,
     "edit_file": grade_edit_file,
     "number_file": grade_number_file,
     "json_file": grade_json_file,
     "list_file": grade_list_file,
+    "multi_edit_file": grade_multi_edit_file,
 }

@@ -1,0 +1,15 @@
+{
+  "id": "H06",
+  "seed": 20261123,
+  "answer": {
+    "name": "Alma"
+  },
+  "planted": {
+    "top_id": "c027",
+    "top_count": 8,
+    "second_id": "c026",
+    "second_count": 6,
+    "unknown_id": "c099",
+    "unknown_count": 11
+  }
+}

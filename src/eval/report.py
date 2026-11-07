@@ -232,28 +232,48 @@ def normalize_args(args, cwd: str | None = None) -> str:
     return json.dumps(_norm_value(args, cwd_n), sort_keys=True, ensure_ascii=False)
 
 
+# 쓰기/수정 도구의 '내용' 인자와 검증 문자열은 핵심 인자 비교에서 뺀다. 로그에서 확인한 이름: content(Write), contains(check_result).
+# old_string, new_string(Edit)은 로그에 한 번도 나오지 않았지만 같은 성격(바꿀 내용)이라 문서상 이름으로 포함했다.
+# 로그에서 이름을 확인하지 못한 인자(Glob, Read의 offset/limit, Grep의 glob/type/-i, Edit의 replace_all)는 핵심으로 취급한다.
+CONTENT_ARG_NAMES = {"content", "old_string", "new_string", "contains"}
+
+
+def core_args(args) -> dict:
+    """도구 인자에서 내용 인자를 뺀 '핵심 인자'(경로 계열, 검색어, 패턴, output_mode 같은 선택 인자)."""
+    if not isinstance(args, dict):
+        return {}
+    return {k: v for k, v in args.items() if k not in CONTENT_ARG_NAMES}
+
+
 def consistency_line(runs: list[Run]) -> str:
-    """같은 과제의 반복 실행 쌍마다 (a) 도구 이름 순서가 같은 비율 (b) 이름과 정규화한 인자까지 같은 비율. 반복 2회 이상인 과제만."""
+    """같은 과제의 반복 실행 쌍마다 (a) 도구 이름 순서 (b) 이름과 핵심 인자 (c) 참고: 이름과 전체 인자가 같은 비율.
+
+    반복이 2회 이상인 과제만 대상. 인자는 키 순서, 경로 구분자, 작업 폴더 접두를 정규화해 비교한다.
+    (b)는 쓰기/수정 도구의 내용 인자(content, old_string, new_string, contains)를 제외한다.
+    """
     by: dict[str, list[Run]] = defaultdict(list)
     for r in runs:
         by[r.task_id].append(r)
     rep = {t: rs for t, rs in by.items() if len(rs) >= 2}
-    pairs = names_eq = full_eq = 0
+    pairs = names_eq = core_eq = full_eq = 0
     for rs in rep.values():
         names = [[n for n, _ in r.seq] for r in rs]
+        core = [[(n, normalize_args(core_args(a), r.cwd)) for n, a in r.seq] for r in rs]
         full = [[(n, normalize_args(a, r.cwd)) for n, a in r.seq] for r in rs]
         for i in range(len(rs)):
             for j in range(i + 1, len(rs)):
                 pairs += 1
                 names_eq += names[i] == names[j]
+                core_eq += core[i] == core[j]
                 full_eq += full[i] == full[j]
     per_task = {t: len(rs) for t, rs in rep.items()}
     k = sum(per_task.values())
+    head = "일관성 (a) 도구 이름 순서 일치 {a} | (b) 이름과 핵심 인자까지 일치 {b} | (c) 참고: 전체 인자까지 일치 {c} "
     if pairs == 0:
-        return (f"일관성 (a) 도구 이름 순서 일치 n/a | (b) 이름과 정규화한 인자까지 일치 n/a "
-                f"({sample_label({})}; 비교한 쌍 0개) — 반복 2회 이상 과제만" + _warn_if_small(0))
-    return (f"일관성 (a) 도구 이름 순서 일치 {100 * names_eq / pairs:.0f}% | (b) 이름과 정규화한 인자까지 일치 {100 * full_eq / pairs:.0f}% "
-            f"({sample_label(per_task)}; 비교한 쌍 {pairs}개) — 반복 2회 이상 과제만" + _warn_if_small(k))
+        return (head.format(a="n/a", b="n/a", c="n/a") + f"({sample_label({})}; 비교한 쌍 0개) — 반복 2회 이상 과제만" + _warn_if_small(0))
+    pct = lambda x: f"{100 * x / pairs:.0f}%"  # noqa: E731
+    return (head.format(a=pct(names_eq), b=pct(core_eq), c=pct(full_eq))
+            + f"({sample_label(per_task)}; 비교한 쌍 {pairs}개) — 반복 2회 이상 과제만" + _warn_if_small(k))
 
 
 def tool_error_split_line(runs: list[Run]) -> str:

@@ -1,0 +1,58 @@
+{
+  "id": "H05",
+  "seed": 20261122,
+  "answer": {
+    "changed": {
+      "svc_04.conf": 6,
+      "svc_05.conf": 1,
+      "svc_06.conf": 4,
+      "svc_08.conf": 8,
+      "svc_09.conf": 8,
+      "svc_10.conf": 13
+    }
+  },
+  "planted": {
+    "expected": {
+      "svc_01.conf": "batch = v4\ntls = 36\nendpoint = http://olds.internal:8080\nretries = auto\nmode = on\nregion = 58\nport = v3\n# endpoint = http://old.internal:8080\nlog_level = auto\nowner = v9\nworkers = v7\nschema = on\npool_size = auto\n",
+      "svc_02.conf": "retries = 18\nschema = on\nowner = 49\nendpoint = http://old.internal:80800\n# endpoint = http://old.internal:8080\nregion = 37\ntls = off\nlog_level = off\nhost = v3\npool_size = on\nport = auto\nmode = auto\nbatch = 12\n",
+      "svc_03.conf": "endpoint = http://old.internal:8081\nretries = v2\nlog_level = auto\nregion = off\nworkers = 43\npool_size = v4\nendpoint = http://old.internal:8080/health\nschema = off\nbatch = 52\nhost = v9\nport = on\nowner = on\n",
+      "svc_04.conf": "host = off\nlog_level = v4\nmode = on\nbatch = 97\nregion = on\nendpoint = http://new.internal:9090\nworkers = auto\n",
+      "svc_05.conf": "endpoint = http://new.internal:9090\nworkers = 78\nhost = on\nretries = on\nlog_level = auto\nschema = auto\nmode = v6\npool_size = v6\nport = 65\ntls = on\n",
+      "svc_06.conf": "pool_size = v3\nlog_level = v4\nowner = 86\nendpoint = http://new.internal:9090\nbackup_endpoint = http://old.internal:8080\ntls = auto\nport = 3\nmode = on\nbatch = on\nhost = on\n",
+      "svc_07.conf": "endpoint = http://old.internal:8080/health\nschema = on\nendpoint = http://olds.internal:8080\nretries = on\nmode = on\nowner = off\nworkers = v9\ntls = 71\nport = 93\nregion = 36\n",
+      "svc_08.conf": "port = 77\nretries = on\nowner = on\nregion = v6\nmode = off\nschema = off\nbackup_endpoint = http://old.internal:8080\nendpoint = http://new.internal:9090\nbatch = off\n",
+      "svc_09.conf": "tls = 99\nmode = on\nretries = v3\nbatch = auto\nowner = v7\nhost = on\nport = off\nendpoint = http://new.internal:9090\nschema = off\n",
+      "svc_10.conf": "region = 47\nowner = auto\npool_size = v5\nport = on\nworkers = v8\nretries = 4\ntls = on\nendpoint = http://old.internal:80800\nschema = 86\nbatch = v6\nlog_level = 20\nmode = off\nendpoint = http://new.internal:9090\n"
+    },
+    "decoys_for": {
+      "svc_01.conf": [
+        "# endpoint = http://old.internal:8080",
+        "endpoint = http://olds.internal:8080"
+      ],
+      "svc_02.conf": [
+        "# endpoint = http://old.internal:8080",
+        "endpoint = http://old.internal:80800"
+      ],
+      "svc_03.conf": [
+        "endpoint = http://old.internal:8081",
+        "endpoint = http://old.internal:8080/health"
+      ],
+      "svc_04.conf": [],
+      "svc_05.conf": [],
+      "svc_06.conf": [
+        "backup_endpoint = http://old.internal:8080"
+      ],
+      "svc_07.conf": [
+        "endpoint = http://old.internal:8080/health",
+        "endpoint = http://olds.internal:8080"
+      ],
+      "svc_08.conf": [
+        "backup_endpoint = http://old.internal:8080"
+      ],
+      "svc_09.conf": [],
+      "svc_10.conf": [
+        "endpoint = http://old.internal:80800"
+      ]
+    }
+  }
+}

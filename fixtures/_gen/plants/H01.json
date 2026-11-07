@@ -1,0 +1,42 @@
+{
+  "id": "H01",
+  "seed": 20261118,
+  "answer": {
+    "items": [
+      "app_07.log: 2675",
+      "app_03.log: 2493",
+      "app_05.log: 2306"
+    ]
+  },
+  "planted": {
+    "words_per_file": {
+      "app_01.log": 1333,
+      "app_02.log": 1514,
+      "app_03.log": 2493,
+      "app_04.log": 1149,
+      "app_05.log": 2306,
+      "app_06.log": 2010,
+      "app_07.log": 2675,
+      "app_08.log": 1533,
+      "app_09.log": 2270,
+      "app_10.log": 1276
+    },
+    "lines_per_file": {
+      "app_01.log": 182,
+      "app_02.log": 215,
+      "app_03.log": 347,
+      "app_04.log": 156,
+      "app_05.log": 298,
+      "app_06.log": 261,
+      "app_07.log": 389,
+      "app_08.log": 204,
+      "app_09.log": 327,
+      "app_10.log": 176
+    },
+    "top_by_lines": [
+      "app_07.log",
+      "app_03.log",
+      "app_09.log"
+    ]
+  }
+}

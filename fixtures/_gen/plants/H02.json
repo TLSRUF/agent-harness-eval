@@ -1,0 +1,23 @@
+{
+  "id": "H02",
+  "seed": 20261119,
+  "answer": {
+    "sum": 313
+  },
+  "planted": {
+    "lines_per_file": {
+      "part_01.txt": 100,
+      "part_02.txt": 41,
+      "part_03.txt": 35,
+      "part_04.txt": 101,
+      "part_05.txt": 88,
+      "part_06.txt": 99,
+      "part_07.txt": 63,
+      "part_08.txt": 18,
+      "part_09.txt": 77,
+      "part_10.txt": 54,
+      "part_11.txt": 29,
+      "part_12.txt": 112
+    }
+  }
+}

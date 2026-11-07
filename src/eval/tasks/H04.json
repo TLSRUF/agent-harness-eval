@@ -1,0 +1,38 @@
+{
+  "id": "H04",
+  "slug": "docs-with-wrong-line-claims",
+  "rev": 1,
+  "difficulty": "hard",
+  "prompt": "작업 폴더에는 문서 10개(.txt)가 있고, 각 문서의 첫 줄에는 `# lines: N` 형태로 그 문서의 줄 수가 적혀 있어. 줄 수는 줄바꿈으로 끝나는 줄의 개수이고, 첫 줄의 '# lines: N' 줄도 세는 줄에 포함한다. 첫 줄에 적힌 N이 실제 줄 수와 다른 문서의 이름을 모두 wrong_docs.out에 저장해줘. 형식: <파일명> (한 줄에 하나, 알파벳 순)",
+  "fixture": "H04",
+  "format_hint": "<파일명> (한 줄에 하나, 알파벳 순)",
+  "outputs": [
+    "wrong_docs.out"
+  ],
+  "grading": {
+    "grader": "list_file",
+    "params": {
+      "path": "wrong_docs.out",
+      "expected_items": [
+        "spec_03.txt",
+        "spec_06.txt",
+        "spec_10.txt"
+      ],
+      "item_pattern": "spec_\\d+\\.txt"
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 항목은 엄격 일치이고, 항목이 다르면 wrong_value, 항목은 같은데 순서·줄 구성만 지시와 다르면 format_error."
+  },
+  "overlap_with": [
+    "file_stats|Read"
+  ],
+  "hand_check": "문서 10개의 줄 수(첫 줄 포함): spec_01.txt: 적힌 52 / 실제 52; spec_02.txt: 적힌 45 / 실제 45; spec_03.txt: 적힌 87 / 실제 88 <-- 다름; spec_04.txt: 적힌 63 / 실제 63; spec_05.txt: 적힌 34 / 실제 34; spec_06.txt: 적힌 51 / 실제 39 <-- 다름; spec_07.txt: 적힌 56 / 실제 56; spec_08.txt: 적힌 120 / 실제 120; spec_09.txt: 적힌 71 / 실제 71; spec_10.txt: 적힌 98 / 실제 97 <-- 다름. 틀린 문서는 ['spec_03.txt', 'spec_06.txt', 'spec_10.txt'] 셋. 오차 1 함정이 두 개 있다: spec_03.txt는 적힌 값이 실제보다 1 작고(헤더 줄을 빼고 센 값), spec_10.txt는 1 크다. 프롬프트가 '첫 줄도 센다'고 정했으므로 둘 다 틀린 문서이고 정답은 하나다. 사람이 확인하는 방법: 각 파일에 `wc -l`을 실행하고 첫 줄 `# lines: N`과 대조.",
+  "answer": {
+    "items": [
+      "spec_03.txt",
+      "spec_06.txt",
+      "spec_10.txt"
+    ]
+  },
+  "min_steps": 12,
+  "min_steps_basis": "검색 1(첫 줄에 적힌 줄 수 모음) + 통계 10(파일 10개의 실제 줄 수) + 쓰기 1. 검색의 개수 모드로 실제 줄 수를 구하는 우회는 최소로 보지 않음(가설: 가능할 수 있음)"
+}

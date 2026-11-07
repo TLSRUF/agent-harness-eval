@@ -1,0 +1,45 @@
+{
+  "id": "H08",
+  "slug": "biggest-file-by-bytes",
+  "rev": 1,
+  "difficulty": "hard",
+  "prompt": "작업 폴더에는 메모 파일(.txt) 10개가 있어. 가장 큰 파일을 찾아줘. 파일 크기는 바이트 수로 비교하고, 크기가 같은 파일이 여럿이면 파일 이름이 알파벳 순으로 앞서는 파일을 고른다. 그 파일의 이름과 바이트 수를 biggest.out에 `파일: <파일명>, 바이트: <숫자>` 형식으로 한 줄만 저장해줘.",
+  "fixture": "H08",
+  "format_hint": "파일: <파일명>, 바이트: <숫자>",
+  "outputs": [
+    "biggest.out"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "biggest.out",
+      "expected_text": "파일: note_06.txt, 바이트: 5016",
+      "value_tokens": [
+        "note_06.txt",
+        "5016"
+      ],
+      "forbid_tokens": [
+        "note_01.txt",
+        "note_02.txt",
+        "note_03.txt",
+        "note_04.txt",
+        "note_05.txt",
+        "note_07.txt",
+        "note_08.txt",
+        "note_09.txt",
+        "note_10.txt"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "file_stats|Read"
+  ],
+  "hand_check": "메모 파일 10개의 바이트 수: {'note_01.txt': 4992, 'note_02.txt': 2900, 'note_03.txt': 3150, 'note_04.txt': 4380, 'note_05.txt': 1800, 'note_06.txt': 5016, 'note_07.txt': 3900, 'note_08.txt': 2640, 'note_09.txt': 3360, 'note_10.txt': 5016}. 글자 수: {'note_01.txt': 2006, 'note_02.txt': 2900, 'note_03.txt': 1264, 'note_04.txt': 1764, 'note_05.txt': 704, 'note_06.txt': 2004, 'note_07.txt': 1582, 'note_08.txt': 1048, 'note_09.txt': 3360, 'note_10.txt': 1984}. 바이트 최댓값 5016가 ['note_06.txt', 'note_10.txt'] 두 파일(동률)이라 알파벳 규칙으로 note_06.txt가 정답. 글자 수 최대 파일은 note_09.txt(영문 위주, 바이트는 더 작음)라 글자 수로 답하면 틀린다. 한글은 글자당 3바이트다. 사람이 확인하는 방법: 각 파일에 `wc -c`(바이트)와 `wc -m`(글자 수)을 실행.",
+  "answer": {
+    "file": "note_06.txt",
+    "bytes": 5016
+  },
+  "min_steps": 11,
+  "min_steps_basis": "통계 10(파일 10개의 바이트 수) + 쓰기 1"
+}

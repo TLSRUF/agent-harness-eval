@@ -1,0 +1,21 @@
+{
+  "id": "H07",
+  "seed": 20261124,
+  "answer": {
+    "timeout": 35
+  },
+  "planted": {
+    "trace": [
+      "main L1: 10",
+      "main L2 include site.conf -> site L1: 50",
+      "main L3 주석, 무시",
+      "main L4 include base.conf -> base L1: 20",
+      "base L2 include net.conf -> net L1: 30",
+      "net L2 include tuning.conf -> tuning L1 include deep.conf -> deep L1: 45",
+      "tuning L2: 40",
+      "net L3: 35",
+      "base L3 retries (timeout 아님)",
+      "main L5 mode (timeout 아님)"
+    ]
+  }
+}

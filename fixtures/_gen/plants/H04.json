@@ -1,0 +1,55 @@
+{
+  "id": "H04",
+  "seed": 20261121,
+  "answer": {
+    "items": [
+      "spec_03.txt",
+      "spec_06.txt",
+      "spec_10.txt"
+    ]
+  },
+  "planted": {
+    "claims": {
+      "spec_01.txt": {
+        "claimed": 52,
+        "actual": 52
+      },
+      "spec_02.txt": {
+        "claimed": 45,
+        "actual": 45
+      },
+      "spec_03.txt": {
+        "claimed": 87,
+        "actual": 88
+      },
+      "spec_04.txt": {
+        "claimed": 63,
+        "actual": 63
+      },
+      "spec_05.txt": {
+        "claimed": 34,
+        "actual": 34
+      },
+      "spec_06.txt": {
+        "claimed": 51,
+        "actual": 39
+      },
+      "spec_07.txt": {
+        "claimed": 56,
+        "actual": 56
+      },
+      "spec_08.txt": {
+        "claimed": 120,
+        "actual": 120
+      },
+      "spec_09.txt": {
+        "claimed": 71,
+        "actual": 71
+      },
+      "spec_10.txt": {
+        "claimed": 98,
+        "actual": 97
+      }
+    }
+  }
+}

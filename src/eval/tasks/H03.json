@@ -1,0 +1,37 @@
+{
+  "id": "H03",
+  "slug": "conflicting-docs-latest-wins",
+  "rev": 1,
+  "difficulty": "hard",
+  "prompt": "작업 폴더에는 문서 6개(.md)가 있고, 문서마다 서로 다른 기본 포트를 적고 있어. 각 문서에는 `Last updated: YYYY-MM-DD` 형식의 줄이 하나씩 있어. 날짜가 가장 최근인 문서가 적은 기본 포트를 따른다. 가장 최근 날짜가 같은 문서가 둘 이상이면 파일 이름이 알파벳 순으로 앞서는 문서를 따른다. 따라야 하는 기본 포트를 port.out에 `포트: <숫자>` 형식으로 한 줄만 저장해줘.",
+  "fixture": "H03",
+  "format_hint": "포트: <숫자>",
+  "outputs": [
+    "port.out"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "port.out",
+      "expected_text": "포트: 8443",
+      "value_tokens": [
+        "8443"
+      ],
+      "forbid_tokens": [
+        "3000",
+        "8080",
+        "8081",
+        "9000",
+        "9090"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [],
+  "hand_check": "문서 6개(문서: Last updated / 기본 포트): changelog.md: 2025-11-20 / 3000; faq.md: 2026-02-02 / 8081; ops_guide.md: 2026-03-14 / 8443; readme.md: 2026-01-05 / 8080; release_notes.md: 2026-03-01 / 9090; runbook.md: 2026-03-14 / 9000. 날짜 형식은 모두 YYYY-MM-DD이고 문서마다 날짜는 하나뿐이다. 가장 최근 날짜 2026-03-14를 가진 문서가 ['ops_guide.md', 'runbook.md'] 둘(동률)이라 규칙에 따라 파일 이름이 알파벳으로 앞선 ops_guide.md의 포트 8443가 정답 (runbook.md의 9000는 오답). 사람이 확인할 표본: [ops_guide.md 2번째 줄 `Last updated: 2026-03-14`, 8번째 줄 `The default port is 8443.`]; [readme.md 2번째 줄 `Last updated: 2026-01-05`, 9번째 줄 `The default port is 8080.`]; [release_notes.md 2번째 줄 `Last updated: 2026-03-01`, 7번째 줄 `Services listen on port 9090 by default.`].",
+  "answer": {
+    "port": 8443
+  },
+  "min_steps": 7,
+  "min_steps_basis": "읽기 6(문서 6개) + 쓰기 1. 검색 1회로 날짜와 포트 줄을 모아 보는 경로(2)는 최소로 보지 않음(가설: 가능할 수 있음)"
+}
