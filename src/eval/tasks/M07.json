@@ -26,5 +26,7 @@
   "hand_check": "메모 파일 9개(각 15~25줄)에서 deadline이 든 줄은 파일별 {'week1.md': 3, 'week2.md': 0, 'week3.md': 2, 'week4.md': 1, 'week5.md': 4, 'week6.md': 0, 'week7.md': 2, 'week8.md': 1, 'week9.md': 1}, 합계 14줄. 사람이 열어서 확인할 표본: [week1.md 13번째 줄 `- We missed the deadline for the demo.`]; [week5.md 11번째 줄 `- The deadline for the report moves to Monday.`]; [week9.md 5번째 줄 `- Reminder: deadline is on Wednesday for the launch.`]. 한 줄에 deadline이 두 번 나오는 줄은 없고, deadlines(복수형)나 Deadline 같은 변형도 없다.",
   "answer": {
     "count": 14
-  }
+  },
+  "min_steps": 2,
+  "min_steps_basis": "검색 1(파일별 개수) + 쓰기 1"
 }

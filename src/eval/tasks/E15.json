@@ -15,5 +15,7 @@
     "allowed": "바꿔야 할 줄이 안 바뀜 wrong_value, 바꾸면 안 되는 줄이 바뀌거나 파일 줄 수가 달라지면 unexpected_change"
   },
   "overlap_with": [],
-  "hand_check": "memo1.txt 7줄: Cat은 2번째 줄 1번, 5번째 줄 1번. memo2.txt 6줄: Cat은 1번째 줄 1번, 4번째 줄 2번. 총 5번. 나머지 줄에는 Cat이 없고 원래 Dog도 없다(cat을 포함한 다른 단어도 없음). 정답은 5곳이 모두 Dog로 바뀌고 줄 수(7, 6)와 나머지 줄은 그대로."
+  "hand_check": "memo1.txt 7줄: Cat은 2번째 줄 1번, 5번째 줄 1번. memo2.txt 6줄: Cat은 1번째 줄 1번, 4번째 줄 2번. 총 5번. 나머지 줄에는 Cat이 없고 원래 Dog도 없다(cat을 포함한 다른 단어도 없음). 정답은 5곳이 모두 Dog로 바뀌고 줄 수(7, 6)와 나머지 줄은 그대로.",
+  "min_steps": 4,
+  "min_steps_basis": "읽기 2 + 쓰기 2(파일마다 읽고 저장)"
 }

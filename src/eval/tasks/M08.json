@@ -39,5 +39,7 @@
   "hand_check": "설정 파일 12개(각 10~19줄)에서 max_connections = 500은 svc06.conf에만 있다. 사람이 열어서 확인할 표본: [svc06.conf 10번째 줄 `max_connections = 500`] (정답), [svc01.conf 7번째 줄 `max_connections = 600`], [svc02.conf 1번째 줄 `max_connections = 300`] (다른 값). 500이라는 숫자는 정답 줄 한 곳에만 나오고(5000, 1500 같은 부분 일치 없음) 모든 파일에 max_connections가 한 번씩 있다.",
   "answer": {
     "file": "svc06.conf"
-  }
+  },
+  "min_steps": 2,
+  "min_steps_basis": "검색 1(파일 목록) + 쓰기 1"
 }

@@ -15,6 +15,9 @@ This harness blocks external connectors linked to the account from being loaded 
 2. Authentication: `claude login` or `ANTHROPIC_API_KEY` (use only one of the two, never both)
 3. `python -m src.agent.smoke`
 
+## Limitations
+- The `file_stats` tool counts lines with `str.splitlines()`, so lone CR, U+2028 and similar characters are also treated as line breaks; the evaluation fixtures contain no such characters.
+
 ## Contributions
 This project is under active development and is not accepting external contributions (pull requests or issues) for now. We will update this notice once things settle.
 

@@ -29,5 +29,7 @@
   "overlap_with": [
     "search_text|Grep"
   ],
-  "hand_check": "다섯 파일 각 3줄. kiwi는 c.txt의 2번째 줄(apple, kiwi, and grape)에만 있다. a/b/d/e에는 없다."
+  "hand_check": "다섯 파일 각 3줄. kiwi는 c.txt의 2번째 줄(apple, kiwi, and grape)에만 있다. a/b/d/e에는 없다.",
+  "min_steps": 2,
+  "min_steps_basis": "검색 1(kiwi가 든 파일) + 쓰기 1"
 }

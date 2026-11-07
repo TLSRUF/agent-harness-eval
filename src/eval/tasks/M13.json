@@ -31,5 +31,7 @@
       "vise",
       "chisel"
     ]
-  }
+  },
+  "min_steps": 2,
+  "min_steps_basis": "읽기 1 + 쓰기 1"
 }

@@ -81,7 +81,7 @@ def test_words_agree_even_with_exotic_whitespace(tmp_path):
         assert g[1] == v[1] == f[1], (data, g, v, f)
 
 
-M_FILES = sorted(p for d in loader.FIXTURES_DIR.glob("[EM][0-9][0-9]") for p in d.iterdir() if p.is_file() and p.name != ".gitkeep")
+M_FILES = sorted(p for d in loader.FIXTURES_DIR.glob("[EMH][0-9][0-9]") for p in d.iterdir() if p.is_file() and p.name != ".gitkeep")  # 쉬움/보통/어려움 전체
 
 
 @pytest.mark.parametrize("path", M_FILES, ids=lambda p: f"{p.parent.name}/{p.name}")
@@ -96,6 +96,17 @@ def test_fixtures_have_no_exotic_line_separators():
     exotic = re.compile("[\r  \u0085\x0b\x0c\x1c\x1d\x1e]")
     bad = [str(p) for p in M_FILES if exotic.search(p.read_bytes().decode("utf-8"))]
     assert bad == []
+
+
+def test_scan_covers_every_task_fixture_folder():
+    """fixtures 아래 폴더는 과제 ID(E/M/H + 두 자리) 또는 _gen뿐이고, 모든 과제 fixture가 위 검사(세 경로 일치, 특수 줄 구분 문자 없음)에 들어간다."""
+    names = [d.name for d in loader.FIXTURES_DIR.iterdir() if d.is_dir()]
+    assert all(n == "_gen" or re.fullmatch(r"[EMH]\d\d", n) for n in names), names
+    scanned = {p.parent.name for p in M_FILES}
+    for t in loader.load_all():
+        if not t.is_todo:
+            real = [p for p in t.fixture_dir.iterdir() if p.is_file() and p.name != ".gitkeep"]
+            assert not real or t.fixture in scanned, t.id
 
 
 def test_stats_fixtures_follow_the_definition_rules():

@@ -23,5 +23,7 @@
   "overlap_with": [
     "search_text|Grep"
   ],
-  "hand_check": "app.log는 13줄. ERROR가 있는 줄은 4번째(disk full), 6번째(write failed), 9번째(timeout contacting db), 12번째(db connection refused) = 4줄. WARN/INFO 줄에는 ERROR가 없다."
+  "hand_check": "app.log는 13줄. ERROR가 있는 줄은 4번째(disk full), 6번째(write failed), 9번째(timeout contacting db), 12번째(db connection refused) = 4줄. WARN/INFO 줄에는 ERROR가 없다.",
+  "min_steps": 2,
+  "min_steps_basis": "검색 1(ERROR 줄 수) + 쓰기 1"
 }

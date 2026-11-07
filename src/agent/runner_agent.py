@@ -18,6 +18,7 @@ from claude_agent_sdk import (
 from .config import HarnessConfig
 from .guard import ToolGuardError, allowed_tool_names, tools_digest, unexpected_tools
 from .ratelimit import extract_windows
+from .snapshot import take_snapshot
 from .tools import ALLOWED_CUSTOM, SERVER_NAME, build_server, sandbox_hooks
 
 RESULTS_DIR = Path("results")
@@ -96,10 +97,13 @@ async def run_task(
     task_id: str = "adhoc",
     fixtures_dir: Path | None = None,
     grader: Callable[[Path], Any] | None = None,
+    outputs: list[str] | None = None,
 ) -> dict[str, Any]:
     """과제 1개를 실행하고 요약 dict를 반환한다. 모든 이벤트는 log_path(jsonl)에 기록된다.
 
     grader가 있으면 임시 폴더가 지워지기 전에 grader(workdir)를 호출해 결과를 기록한다.
+    임시 폴더가 지워지기 전에 outputs(과제의 출력 파일)와 내용이 바뀐 입력 파일을 results/raw/<로그 줄기>_final/에 저장하고
+    snapshot 이벤트를 남긴다(재채점용, src/eval/regrade.py). fixtures_dir와 outputs가 모두 없으면 저장할 대상이 없어 건너뛴다.
     """
     log = TrajectoryWriter(log_path)
     summary: dict[str, Any] = {
@@ -161,6 +165,12 @@ async def run_task(
             except Exception as e:
                 summary["graded"] = {"grader_error": f"{type(e).__name__}: {e}"}
             log.write("grade", graded=summary["graded"])
+        if guard_error is None and (outputs or fixtures_dir is not None):
+            try:
+                snap = take_snapshot(workdir, fixtures_dir, outputs, RAW_DIR / f"{Path(log_path).stem}_final")
+            except Exception as e:  # 스냅샷 실패가 실행 결과를 망치지 않게 기록만 한다
+                snap = {"error": f"{type(e).__name__}: {e}"}
+            log.write("snapshot", **snap)
     summary["wall_ms"] = int((time.monotonic() - t0) * 1000)
     log.write("summary", **summary)
     log.close()

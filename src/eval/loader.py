@@ -48,7 +48,8 @@ _B0, _B1 = r"(?<![A-Za-z0-9_])", r"(?![A-Za-z0-9_])"  # ASCII 경계: 한국어 
 LINT_INSENSITIVE = [r"search_text", r"file_stats", r"check_result", r"mcp__",
                     _B0 + r"grep" + _B1, _B0 + r"glob" + _B1, _B0 + r"bash" + _B1]
 LINT_SENSITIVE = [_B0 + r"Read" + _B1, _B0 + r"Write" + _B1, _B0 + r"Edit" + _B1]
-KEYS_REQUIRED = {"id", "slug", "rev", "difficulty", "prompt", "fixture", "outputs", "grading", "overlap_with", "hand_check"}
+KEYS_REQUIRED = {"id", "slug", "rev", "difficulty", "prompt", "fixture", "outputs", "grading", "overlap_with", "hand_check",
+                 "min_steps", "min_steps_basis"}  # min_steps: 분석 전용(에이전트에게 전달되지 않음), 동결 전 필수
 KEYS_OPTIONAL = {"format_hint", "status", "_comment", "answer"}
 
 
@@ -66,6 +67,8 @@ class Task:
     hand_check: str
     format_hint: str | None = None
     status: str = "ready"
+    min_steps: int | None = None  # 분석 전용: 가장 짧은 정직한 풀이의 도구 호출 수(사람이 정한 추정값)
+    min_steps_basis: str = ""
     raw: dict = field(default_factory=dict, repr=False)
 
     @property
@@ -83,7 +86,8 @@ def load_task(path: Path) -> Task:
         id=d.get("id", ""), slug=d.get("slug", ""), rev=d.get("rev", 0), difficulty=d.get("difficulty", ""),
         prompt=d.get("prompt", ""), fixture=d.get("fixture", ""), outputs=d.get("outputs", []),
         grading=d.get("grading", {}), overlap_with=d.get("overlap_with", []), hand_check=d.get("hand_check", ""),
-        format_hint=d.get("format_hint"), status=d.get("status", "ready"), raw=d,
+        format_hint=d.get("format_hint"), status=d.get("status", "ready"),
+        min_steps=d.get("min_steps"), min_steps_basis=d.get("min_steps_basis", ""), raw=d,
     )
 
 
@@ -146,6 +150,12 @@ def validate_static(task: Task) -> list[str]:
         return errs
     if not isinstance(task.rev, int) or task.rev < 1:
         errs.append("rev는 1 이상의 정수")
+    ms = task.raw.get("min_steps")
+    if isinstance(ms, bool) or not isinstance(ms, int) or ms < 1:
+        errs.append(f"min_steps는 1 이상의 정수여야 함: {ms!r}")
+    basis = task.raw.get("min_steps_basis")
+    if not isinstance(basis, str) or not basis.strip():
+        errs.append("min_steps_basis(근거 한 줄) 필수")
     if not task.slug:
         errs.append("slug 비어 있음")
     if not task.prompt.strip():

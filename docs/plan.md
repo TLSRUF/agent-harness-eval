@@ -34,6 +34,8 @@
 
 &#x20; - failure_type 집계: 채점 결과의 failure_type(pass, wrong_value, format_error, missing_output, unexpected_change)을 report.py 집계에 반영하는 일은 Day 7 이후로 미룬다. 현재 report.py는 (subtype, 채점 통과 여부) 5범주만 집계하고, failure_type은 jsonl의 grade 이벤트(graded.failure_type)에 기록만 된다.
 
+&#x20; - 스냅샷과 재채점 완료(2026-11-07): `run_task`가 채점 직후 임시 폴더가 지워지기 전에 outputs와 바뀐 입력 파일을 `results/raw/<로그 줄기>_final/`에 저장하고(파일당 1MB, 실행당 5MB 상한, 초과분은 jsonl의 snapshot 이벤트에 기록), `python -m src.eval.regrade <glob>`가 현재 채점기로 다시 채점한다(모델 호출 없음). **Day 7 러너는 `run_task(..., outputs=task.outputs)`로 호출해야** 스냅샷에 출력 파일이 담긴다. report.py에는 pass^k, 일관성, 도구 오류율(커스텀/내장 구분), min_steps 구간별 성공률도 추가됐다.
+
 
 
 \## 2주차: 베이스라인과 실험 A\~C

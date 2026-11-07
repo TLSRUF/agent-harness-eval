@@ -34,5 +34,7 @@
       "catalog.conf",
       "storage.conf"
     ]
-  }
+  },
+  "min_steps": 2,
+  "min_steps_basis": "검색 1(파일 목록) + 쓰기 1"
 }
