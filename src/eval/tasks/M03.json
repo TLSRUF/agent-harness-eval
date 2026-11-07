@@ -1,0 +1,35 @@
+{
+  "id": "M03",
+  "slug": "first-error-line",
+  "rev": 1,
+  "difficulty": "medium",
+  "prompt": "작업 폴더의 orders.log에는 주문 서비스 로그가 들어 있어. 오류 코드 E4021이 처음 나오는 줄이 몇 번째 줄인지 찾아 first_line.txt에 `줄 번호: <숫자>` 형식으로 한 줄만 저장해줘. 첫 줄이 1번이야.",
+  "fixture": "M03",
+  "format_hint": "줄 번호: <숫자>",
+  "outputs": [
+    "first_line.txt"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "first_line.txt",
+      "expected_text": "줄 번호: 112",
+      "value_tokens": [
+        "112"
+      ],
+      "forbid_tokens": [
+        "153",
+        "158",
+        "166"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "search_text|Grep"
+  ],
+  "hand_check": "orders.log는 350줄이고 E4021은 [112, 153, 158, 166]번째 줄에 나오며 처음은 112번째 줄. 사람이 열어서 확인할 표본: [112번째 줄 `2026-05-04 08:09:45 order-svc ERROR order=4000347 code=E4021 order rejected`] (처음), [111번째 줄 `2026-05-04 08:09:42 order-svc INFO order=4000346 code=S2000 shipment queued`] (그 바로 앞 줄에는 E4021 없음), [153번째 줄 `2026-05-04 08:13:29 order-svc ERROR order=4000472 code=E4021 order rejected`] (두 번째 등장). 한 글자만 다른 별개 코드도 있다: E4020 [29번째 줄 `2026-05-04 08:02:30 order-svc ERROR order=4000082 code=E4020 order rejected`], E4022 [10번째 줄 `2026-05-04 08:00:47 order-svc ERROR order=4000023 code=E4022 carrier unavailable`]. E4021로 시작하거나 끝나는 더 긴 코드는 없다.",
+  "answer": {
+    "line": 112
+  }
+}

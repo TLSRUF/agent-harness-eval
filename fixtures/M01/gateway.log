@@ -1,0 +1,300 @@
+2026-05-03 14:00:03 gw-a dev-017 firmware v2.3 ok
+2026-05-03 14:00:06 gw-b dev-021 temp=20.2C
+2026-05-03 14:00:10 gw-b dev-028 heartbeat ok
+2026-05-03 14:00:14 gw-b dev-017 rssi=-73dBm
+2026-05-03 14:00:15 gw-a dev-040 rssi=-68dBm
+2026-05-03 14:00:18 gw-b dev-023 battery=83%
+2026-05-03 14:00:26 gw-b dev-007 battery=90%
+2026-05-03 14:00:34 gw-a dev-033 firmware v1.2 ok
+2026-05-03 14:00:43 gw-b dev-010 battery=81%
+2026-05-03 14:00:51 gw-a dev-012 humidity=32%
+2026-05-03 14:00:54 gw-b dev-020 humidity=56%
+2026-05-03 14:01:00 gw-a dev-004 battery=52%
+2026-05-03 14:01:05 gw-a dev-022 humidity=49%
+2026-05-03 14:01:11 gw-b dev-017 rssi=-67dBm
+2026-05-03 14:01:14 gw-b dev-003 firmware v2.3 ok
+2026-05-03 14:01:23 gw-b dev-036 battery=76%
+2026-05-03 14:01:25 gw-a dev-034 battery=86%
+2026-05-03 14:01:27 gw-a dev-032 firmware v1.9 ok
+2026-05-03 14:01:32 gw-b dev-019 temp=24.6C
+2026-05-03 14:01:35 gw-a dev-039 humidity=30%
+2026-05-03 14:01:42 gw-a dev-022 temp=26.2C
+2026-05-03 14:01:51 gw-b dev-031 firmware v2.6 ok
+2026-05-03 14:01:59 gw-b dev-017 rssi=-72dBm
+2026-05-03 14:02:02 gw-a dev-010 firmware v1.0 ok
+2026-05-03 14:02:09 gw-a dev-013 rssi=-42dBm
+2026-05-03 14:02:10 gw-b dev-017 temp=20.1C
+2026-05-03 14:02:18 gw-b dev-036 firmware v3.8 ok
+2026-05-03 14:02:23 gw-a dev-008 firmware v2.3 ok
+2026-05-03 14:02:25 gw-b dev-015 humidity=61%
+2026-05-03 14:02:26 gw-a dev-012 temp=20.1C
+2026-05-03 14:02:27 gw-b dev-017 rssi=-63dBm
+2026-05-03 14:02:30 gw-b dev-003 heartbeat ok
+2026-05-03 14:02:37 gw-a dev-028 heartbeat ok
+2026-05-03 14:02:46 gw-b dev-003 heartbeat ok
+2026-05-03 14:02:47 gw-a dev-011 firmware v2.9 ok
+2026-05-03 14:02:56 gw-a dev-040 rssi=-71dBm
+2026-05-03 14:03:05 gw-a dev-002 battery=84%
+2026-05-03 14:03:07 gw-a dev-020 rssi=-69dBm
+2026-05-03 14:03:15 gw-b dev-026 humidity=47%
+2026-05-03 14:03:22 gw-b dev-026 rssi=-89dBm
+2026-05-03 14:03:31 gw-a dev-028 firmware v3.0 ok
+2026-05-03 14:03:35 gw-b dev-023 rssi=-84dBm
+2026-05-03 14:03:42 gw-b dev-023 temp=20.3C
+2026-05-03 14:03:51 gw-a dev-037 firmware v1.5 ok
+2026-05-03 14:03:54 gw-b dev-004 heartbeat ok
+2026-05-03 14:04:00 gw-b dev-022 temp=31.2C
+2026-05-03 14:04:06 gw-a dev-017 battery=39%
+2026-05-03 14:04:11 gw-a dev-014 humidity=70%
+2026-05-03 14:04:17 gw-b dev-011 rssi=-59dBm
+2026-05-03 14:04:24 gw-a dev-028 heartbeat ok
+2026-05-03 14:04:31 gw-a dev-006 rssi=-49dBm
+2026-05-03 14:04:36 gw-b dev-024 battery=95%
+2026-05-03 14:04:44 gw-a dev-017 humidity=32%
+2026-05-03 14:04:51 gw-b dev-021 battery=26%
+2026-05-03 14:04:55 gw-a dev-004 heartbeat ok
+2026-05-03 14:05:04 gw-b dev-040 temp=21.6C
+2026-05-03 14:05:11 gw-a dev-028 heartbeat ok
+2026-05-03 14:05:20 gw-b dev-008 humidity=58%
+2026-05-03 14:05:29 gw-b dev-009 temp=24.9C
+2026-05-03 14:05:30 gw-a dev-017 heartbeat ok
+2026-05-03 14:05:32 gw-b dev-035 rssi=-51dBm
+2026-05-03 14:05:33 gw-b dev-001 temp=22.4C
+2026-05-03 14:05:36 gw-b dev-029 firmware v3.7 ok
+2026-05-03 14:05:41 gw-b dev-032 rssi=-71dBm
+2026-05-03 14:05:48 gw-a dev-017 temp=22.8C
+2026-05-03 14:05:56 gw-a dev-012 rssi=-85dBm
+2026-05-03 14:06:04 gw-a dev-016 heartbeat ok
+2026-05-03 14:06:09 gw-b dev-011 rssi=-55dBm
+2026-05-03 14:06:16 gw-b dev-026 humidity=68%
+2026-05-03 14:06:24 gw-b dev-017 humidity=45%
+2026-05-03 14:06:27 gw-a dev-022 temp=29.1C
+2026-05-03 14:06:29 gw-a dev-028 humidity=34%
+2026-05-03 14:06:34 gw-a dev-017 heartbeat ok
+2026-05-03 14:06:43 gw-b dev-003 temp=24.4C
+2026-05-03 14:06:45 gw-a dev-010 humidity=64%
+2026-05-03 14:06:54 gw-a dev-035 firmware v2.4 ok
+2026-05-03 14:06:57 gw-a dev-026 firmware v3.7 ok
+2026-05-03 14:07:01 gw-b dev-014 humidity=41%
+2026-05-03 14:07:08 gw-a dev-002 humidity=32%
+2026-05-03 14:07:16 gw-a dev-007 humidity=66%
+2026-05-03 14:07:20 gw-a dev-034 rssi=-70dBm
+2026-05-03 14:07:22 gw-a dev-031 firmware v1.2 ok
+2026-05-03 14:07:24 gw-b dev-027 humidity=49%
+2026-05-03 14:07:29 gw-b dev-028 rssi=-90dBm
+2026-05-03 14:07:35 gw-b dev-037 heartbeat ok
+2026-05-03 14:07:40 gw-b dev-001 temp=22.9C
+2026-05-03 14:07:47 gw-b dev-028 battery=64%
+2026-05-03 14:07:50 gw-b dev-027 temp=25.3C
+2026-05-03 14:07:53 gw-a dev-032 rssi=-88dBm
+2026-05-03 14:07:59 gw-b dev-010 firmware v1.6 ok
+2026-05-03 14:08:02 gw-b dev-019 firmware v1.1 ok
+2026-05-03 14:08:08 gw-a dev-005 humidity=31%
+2026-05-03 14:08:11 gw-b dev-006 temp=20.5C
+2026-05-03 14:08:17 gw-a dev-014 humidity=62%
+2026-05-03 14:08:20 gw-b dev-032 humidity=69%
+2026-05-03 14:08:25 gw-a dev-037 rssi=-50dBm
+2026-05-03 14:08:31 gw-b dev-011 temp=18.1C
+2026-05-03 14:08:36 gw-a dev-009 humidity=32%
+2026-05-03 14:08:43 gw-a dev-039 firmware v2.7 ok
+2026-05-03 14:08:47 gw-a dev-019 temp=22.5C
+2026-05-03 14:08:48 gw-a dev-002 battery=52%
+2026-05-03 14:08:57 gw-b dev-007 battery=73%
+2026-05-03 14:09:03 gw-a dev-030 humidity=68%
+2026-05-03 14:09:09 gw-a dev-013 heartbeat ok
+2026-05-03 14:09:16 gw-a dev-013 heartbeat ok
+2026-05-03 14:09:21 gw-a dev-013 humidity=64%
+2026-05-03 14:09:27 gw-a dev-032 firmware v2.5 ok
+2026-05-03 14:09:29 gw-b dev-025 rssi=-83dBm
+2026-05-03 14:09:36 gw-b dev-021 battery=51%
+2026-05-03 14:09:40 gw-b dev-002 battery=44%
+2026-05-03 14:09:45 gw-b dev-012 firmware v1.9 ok
+2026-05-03 14:09:52 gw-b dev-012 temp=25.0C
+2026-05-03 14:09:55 gw-a dev-017 heartbeat ok
+2026-05-03 14:09:58 gw-a dev-011 battery=49%
+2026-05-03 14:10:03 gw-b dev-007 temp=26.4C
+2026-05-03 14:10:12 gw-b dev-005 rssi=-70dBm
+2026-05-03 14:10:19 gw-a dev-022 heartbeat ok
+2026-05-03 14:10:26 gw-a dev-029 temp=30.8C
+2026-05-03 14:10:30 gw-a dev-040 firmware v3.2 ok
+2026-05-03 14:10:37 gw-b dev-004 temp=26.2C
+2026-05-03 14:10:45 gw-b dev-019 temp=20.9C
+2026-05-03 14:10:53 gw-a dev-015 battery=80%
+2026-05-03 14:10:55 gw-a dev-039 temp=22.8C
+2026-05-03 14:10:56 gw-a dev-036 temp=24.8C
+2026-05-03 14:10:59 gw-a dev-029 battery=60%
+2026-05-03 14:11:04 gw-b dev-022 firmware v2.2 ok
+2026-05-03 14:11:10 gw-b dev-027 heartbeat ok
+2026-05-03 14:11:12 gw-b dev-005 firmware v2.0 ok
+2026-05-03 14:11:20 gw-b dev-035 humidity=56%
+2026-05-03 14:11:24 gw-a dev-002 battery=44%
+2026-05-03 14:11:27 gw-a dev-020 humidity=43%
+2026-05-03 14:11:34 gw-b dev-004 rssi=-75dBm
+2026-05-03 14:11:39 gw-b dev-008 heartbeat ok
+2026-05-03 14:11:44 gw-a dev-011 battery=72%
+2026-05-03 14:11:51 gw-b dev-023 rssi=-87dBm
+2026-05-03 14:12:00 gw-a dev-011 firmware v2.0 ok
+2026-05-03 14:12:05 gw-a dev-004 heartbeat ok
+2026-05-03 14:12:07 gw-a dev-019 rssi=-89dBm
+2026-05-03 14:12:16 gw-b dev-021 humidity=41%
+2026-05-03 14:12:19 gw-b dev-004 firmware v1.4 ok
+2026-05-03 14:12:20 gw-a dev-017 temp=23.1C
+2026-05-03 14:12:29 gw-a dev-001 firmware v3.9 ok
+2026-05-03 14:12:31 gw-a dev-006 temp=21.3C
+2026-05-03 14:12:38 gw-b dev-013 humidity=44%
+2026-05-03 14:12:40 gw-a dev-035 humidity=41%
+2026-05-03 14:12:43 gw-a dev-039 heartbeat ok
+2026-05-03 14:12:48 gw-b dev-038 heartbeat ok
+2026-05-03 14:12:54 gw-a dev-009 battery=96%
+2026-05-03 14:12:59 gw-b dev-023 humidity=54%
+2026-05-03 14:13:08 gw-a dev-011 humidity=45%
+2026-05-03 14:13:10 gw-a dev-008 firmware v2.6 ok
+2026-05-03 14:13:15 gw-a dev-015 rssi=-63dBm
+2026-05-03 14:13:21 gw-b dev-003 firmware v3.0 ok
+2026-05-03 14:13:22 gw-b dev-014 battery=36%
+2026-05-03 14:13:25 gw-a dev-026 temp=31.5C
+2026-05-03 14:13:26 gw-b dev-020 rssi=-78dBm
+2026-05-03 14:13:30 gw-b dev-021 rssi=-59dBm
+2026-05-03 14:13:36 gw-b dev-015 battery=52%
+2026-05-03 14:13:44 gw-a dev-004 temp=31.6C
+2026-05-03 14:13:51 gw-b dev-038 humidity=70%
+2026-05-03 14:13:56 gw-a dev-008 heartbeat ok
+2026-05-03 14:14:01 gw-a dev-022 temp=27.5C
+2026-05-03 14:14:09 gw-a dev-002 battery=24%
+2026-05-03 14:14:13 gw-b dev-036 humidity=55%
+2026-05-03 14:14:17 gw-b dev-016 heartbeat ok
+2026-05-03 14:14:22 gw-a dev-029 heartbeat ok
+2026-05-03 14:14:26 gw-b dev-035 heartbeat ok
+2026-05-03 14:14:29 gw-a dev-020 battery=93%
+2026-05-03 14:14:37 gw-a dev-017 battery=70%
+2026-05-03 14:14:38 gw-a dev-022 rssi=-77dBm
+2026-05-03 14:14:44 gw-b dev-033 firmware v3.7 ok
+2026-05-03 14:14:51 gw-a dev-032 firmware v2.3 ok
+2026-05-03 14:14:55 gw-b dev-010 rssi=-76dBm
+2026-05-03 14:15:04 gw-b dev-011 heartbeat ok
+2026-05-03 14:15:11 gw-a dev-010 rssi=-59dBm
+2026-05-03 14:15:15 gw-b dev-030 heartbeat ok
+2026-05-03 14:15:17 gw-b dev-029 rssi=-57dBm
+2026-05-03 14:15:18 gw-a dev-033 firmware v1.5 ok
+2026-05-03 14:15:26 gw-b dev-004 rssi=-64dBm
+2026-05-03 14:15:33 gw-b dev-006 humidity=55%
+2026-05-03 14:15:35 gw-a dev-039 firmware v1.7 ok
+2026-05-03 14:15:38 gw-a dev-017 battery=54%
+2026-05-03 14:15:44 gw-b dev-026 humidity=61%
+2026-05-03 14:15:50 gw-a dev-008 temp=26.2C
+2026-05-03 14:15:52 gw-a dev-019 heartbeat ok
+2026-05-03 14:16:00 gw-b dev-015 humidity=45%
+2026-05-03 14:16:02 gw-a dev-038 battery=81%
+2026-05-03 14:16:09 gw-b dev-038 humidity=62%
+2026-05-03 14:16:18 gw-a dev-039 battery=24%
+2026-05-03 14:16:22 gw-a dev-039 rssi=-48dBm
+2026-05-03 14:16:24 gw-a dev-010 rssi=-59dBm
+2026-05-03 14:16:27 gw-b dev-016 humidity=46%
+2026-05-03 14:16:34 gw-b dev-033 humidity=38%
+2026-05-03 14:16:36 gw-a dev-014 humidity=49%
+2026-05-03 14:16:45 gw-b dev-021 humidity=52%
+2026-05-03 14:16:48 gw-b dev-032 battery=24%
+2026-05-03 14:16:57 gw-b dev-031 firmware v2.4 ok
+2026-05-03 14:17:03 gw-b dev-023 firmware v1.8 ok
+2026-05-03 14:17:09 gw-b dev-017 heartbeat ok
+2026-05-03 14:17:11 gw-b dev-005 battery=21%
+2026-05-03 14:17:14 gw-b dev-026 firmware v3.7 ok
+2026-05-03 14:17:23 gw-b dev-017 humidity=68%
+2026-05-03 14:17:28 gw-a dev-002 rssi=-58dBm
+2026-05-03 14:17:33 gw-a dev-002 temp=27.6C
+2026-05-03 14:17:39 gw-b dev-019 humidity=44%
+2026-05-03 14:17:46 gw-a dev-013 rssi=-58dBm
+2026-05-03 14:17:53 gw-b dev-020 battery=42%
+2026-05-03 14:18:00 gw-b dev-039 rssi=-73dBm
+2026-05-03 14:18:05 gw-a dev-025 heartbeat ok
+2026-05-03 14:18:12 gw-b dev-005 temp=26.8C
+2026-05-03 14:18:15 gw-b dev-011 temp=18.4C
+2026-05-03 14:18:24 gw-a dev-027 battery=39%
+2026-05-03 14:18:26 gw-a dev-025 temp=18.7C
+2026-05-03 14:18:34 gw-b dev-038 battery=44%
+2026-05-03 14:18:37 gw-a dev-038 humidity=68%
+2026-05-03 14:18:39 gw-b dev-034 heartbeat ok
+2026-05-03 14:18:42 gw-a dev-038 humidity=37%
+2026-05-03 14:18:43 gw-b dev-022 firmware v1.1 ok
+2026-05-03 14:18:48 gw-b dev-031 temp=26.1C
+2026-05-03 14:18:51 gw-b dev-020 temp=26.1C
+2026-05-03 14:19:00 gw-b dev-021 humidity=40%
+2026-05-03 14:19:04 gw-b dev-031 firmware v1.0 ok
+2026-05-03 14:19:06 gw-a dev-031 battery=38%
+2026-05-03 14:19:09 gw-a dev-011 temp=19.9C
+2026-05-03 14:19:13 gw-a dev-026 heartbeat ok
+2026-05-03 14:19:21 gw-b dev-013 rssi=-49dBm
+2026-05-03 14:19:22 gw-b dev-027 battery=42%
+2026-05-03 14:19:25 gw-b dev-007 rssi=-40dBm
+2026-05-03 14:19:33 gw-b dev-017 humidity=44%
+2026-05-03 14:19:34 gw-a dev-025 heartbeat ok
+2026-05-03 14:19:43 gw-b dev-019 battery=88%
+2026-05-03 14:19:46 gw-a dev-040 firmware v1.9 ok
+2026-05-03 14:19:52 gw-a dev-033 rssi=-43dBm
+2026-05-03 14:20:01 gw-a dev-035 humidity=30%
+2026-05-03 14:20:09 gw-b dev-001 rssi=-41dBm
+2026-05-03 14:20:12 gw-a dev-034 firmware v2.3 ok
+2026-05-03 14:20:14 gw-b dev-004 battery=32%
+2026-05-03 14:20:19 gw-a dev-003 rssi=-47dBm
+2026-05-03 14:20:28 gw-b dev-010 firmware v3.6 ok
+2026-05-03 14:20:32 gw-b dev-035 humidity=30%
+2026-05-03 14:20:39 gw-a dev-039 humidity=57%
+2026-05-03 14:20:47 gw-a dev-009 battery=54%
+2026-05-03 14:20:49 gw-b dev-032 heartbeat ok
+2026-05-03 14:20:50 gw-b dev-013 firmware v3.0 ok
+2026-05-03 14:20:56 gw-b dev-008 rssi=-89dBm
+2026-05-03 14:20:58 gw-a dev-023 temp=22.2C
+2026-05-03 14:21:03 gw-b dev-025 rssi=-90dBm
+2026-05-03 14:21:10 gw-a dev-025 firmware v1.1 ok
+2026-05-03 14:21:11 gw-a dev-031 humidity=38%
+2026-05-03 14:21:19 gw-b dev-002 humidity=63%
+2026-05-03 14:21:21 gw-b dev-017 heartbeat ok
+2026-05-03 14:21:26 gw-a dev-017 rssi=-85dBm
+2026-05-03 14:21:34 gw-b dev-001 battery=50%
+2026-05-03 14:21:43 gw-b dev-017 humidity=69%
+2026-05-03 14:21:49 gw-b dev-019 humidity=59%
+2026-05-03 14:21:54 gw-a dev-011 heartbeat ok
+2026-05-03 14:22:00 gw-a dev-033 temp=31.9C
+2026-05-03 14:22:06 gw-b dev-008 rssi=-83dBm
+2026-05-03 14:22:14 gw-a dev-001 firmware v2.9 ok
+2026-05-03 14:22:16 gw-a dev-039 firmware v1.9 ok
+2026-05-03 14:22:25 gw-b dev-016 heartbeat ok
+2026-05-03 14:22:30 gw-b dev-007 firmware v1.7 ok
+2026-05-03 14:22:34 gw-b dev-022 rssi=-62dBm
+2026-05-03 14:22:35 gw-b dev-024 firmware v2.8 ok
+2026-05-03 14:22:39 gw-a dev-004 firmware v2.8 ok
+2026-05-03 14:22:48 gw-b dev-028 firmware v2.6 ok
+2026-05-03 14:22:54 gw-a dev-016 battery=40%
+2026-05-03 14:22:55 gw-a dev-031 battery=89%
+2026-05-03 14:22:59 gw-a dev-003 humidity=59%
+2026-05-03 14:23:03 gw-a dev-012 humidity=63%
+2026-05-03 14:23:08 gw-a dev-008 humidity=46%
+2026-05-03 14:23:14 gw-a dev-009 temp=28.3C
+2026-05-03 14:23:22 gw-b dev-011 battery=87%
+2026-05-03 14:23:27 gw-b dev-009 heartbeat ok
+2026-05-03 14:23:28 gw-b dev-007 temp=24.9C
+2026-05-03 14:23:30 gw-a dev-003 temp=19.2C
+2026-05-03 14:23:31 gw-a dev-004 battery=67%
+2026-05-03 14:23:35 gw-b dev-014 humidity=41%
+2026-05-03 14:23:37 gw-a dev-013 firmware v2.6 ok
+2026-05-03 14:23:40 gw-b dev-025 temp=21.3C
+2026-05-03 14:23:42 gw-b dev-006 temp=26.5C
+2026-05-03 14:23:44 gw-a dev-014 humidity=39%
+2026-05-03 14:23:50 gw-a dev-040 humidity=30%
+2026-05-03 14:23:58 gw-a dev-016 rssi=-77dBm
+2026-05-03 14:24:03 gw-a dev-015 firmware v2.6 ok
+2026-05-03 14:24:06 gw-b dev-039 battery=31%
+2026-05-03 14:24:13 gw-b dev-017 firmware v3.8 ok
+2026-05-03 14:24:20 gw-a dev-010 battery=40%
+2026-05-03 14:24:27 gw-b dev-020 heartbeat ok
+2026-05-03 14:24:32 gw-a dev-014 battery=54%
+2026-05-03 14:24:40 gw-a dev-015 heartbeat ok
+2026-05-03 14:24:43 gw-a dev-032 rssi=-81dBm
+2026-05-03 14:24:48 gw-b dev-013 rssi=-54dBm
+2026-05-03 14:24:49 gw-a dev-024 temp=21.6C
+2026-05-03 14:24:54 gw-a dev-001 temp=19.9C
+2026-05-03 14:25:00 gw-b dev-040 battery=50%
+2026-05-03 14:25:03 gw-a dev-024 heartbeat ok
+2026-05-03 14:25:09 gw-a dev-032 firmware v1.5 ok
+2026-05-03 14:25:17 gw-b dev-011 rssi=-83dBm
+2026-05-03 14:25:18 gw-b dev-016 heartbeat ok

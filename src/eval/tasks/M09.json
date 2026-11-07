@@ -1,0 +1,41 @@
+{
+  "id": "M09",
+  "slug": "longest-file",
+  "rev": 1,
+  "difficulty": "medium",
+  "prompt": "작업 폴더에는 문서 파일(.txt) 10개가 있어. 줄 수가 가장 많은 파일의 이름을 longest.out에 `가장 긴 파일: <파일명>` 형식으로 한 줄만 저장해줘. 줄 수는 줄바꿈으로 끝나는 줄의 개수야.",
+  "fixture": "M09",
+  "format_hint": "가장 긴 파일: <파일명>",
+  "outputs": [
+    "longest.out"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "longest.out",
+      "expected_text": "가장 긴 파일: doc_04.txt",
+      "value_tokens": [
+        "doc_04.txt"
+      ],
+      "forbid_tokens": [
+        "doc_01.txt",
+        "doc_02.txt",
+        "doc_03.txt",
+        "doc_05.txt",
+        "doc_06.txt",
+        "doc_07.txt",
+        "doc_08.txt",
+        "doc_09.txt",
+        "doc_10.txt"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "file_stats|Read"
+  ],
+  "hand_check": "문서 파일 10개의 줄 수: {'doc_01.txt': 45, 'doc_02.txt': 19, 'doc_03.txt': 38, 'doc_04.txt': 47, 'doc_05.txt': 31, 'doc_06.txt': 9, 'doc_07.txt': 33, 'doc_08.txt': 27, 'doc_09.txt': 14, 'doc_10.txt': 22}. 최댓값 47는 doc_04.txt 하나뿐이고 2등은 45. 모든 파일이 끝 줄바꿈으로 끝나고 빈 줄이 없다. 사람이 확인할 표본: doc_04.txt를 열어 줄 수를 세면 47, 2등 파일 doc_01.txt는 45.",
+  "answer": {
+    "file": "doc_04.txt"
+  }
+}

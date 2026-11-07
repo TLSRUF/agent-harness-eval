@@ -1,0 +1,43 @@
+{
+  "id": "M08",
+  "slug": "file-with-max-connections-500",
+  "rev": 1,
+  "difficulty": "medium",
+  "prompt": "작업 폴더에는 서비스 설정 파일(.conf) 12개가 있어. 그중 max_connections = 500으로 설정한 파일의 이름을 conn_file.out에 `파일: <파일명>` 형식으로 한 줄만 저장해줘.",
+  "fixture": "M08",
+  "format_hint": "파일: <파일명>",
+  "outputs": [
+    "conn_file.out"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "conn_file.out",
+      "expected_text": "파일: svc06.conf",
+      "value_tokens": [
+        "svc06.conf"
+      ],
+      "forbid_tokens": [
+        "svc01.conf",
+        "svc02.conf",
+        "svc03.conf",
+        "svc04.conf",
+        "svc05.conf",
+        "svc07.conf",
+        "svc08.conf",
+        "svc09.conf",
+        "svc10.conf",
+        "svc11.conf",
+        "svc12.conf"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "search_text|Grep"
+  ],
+  "hand_check": "설정 파일 12개(각 10~19줄)에서 max_connections = 500은 svc06.conf에만 있다. 사람이 열어서 확인할 표본: [svc06.conf 10번째 줄 `max_connections = 500`] (정답), [svc01.conf 7번째 줄 `max_connections = 600`], [svc02.conf 1번째 줄 `max_connections = 300`] (다른 값). 500이라는 숫자는 정답 줄 한 곳에만 나오고(5000, 1500 같은 부분 일치 없음) 모든 파일에 max_connections가 한 번씩 있다.",
+  "answer": {
+    "file": "svc06.conf"
+  }
+}

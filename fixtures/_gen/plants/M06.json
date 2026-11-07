@@ -1,0 +1,20 @@
+{
+  "id": "M06",
+  "seed": 20261106,
+  "answer": {
+    "items": [
+      "analytics.conf",
+      "billing.conf",
+      "catalog.conf",
+      "storage.conf"
+    ]
+  },
+  "planted": {
+    "planted_files": [
+      "analytics",
+      "billing",
+      "catalog",
+      "storage"
+    ]
+  }
+}

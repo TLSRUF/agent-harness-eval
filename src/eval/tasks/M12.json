@@ -1,0 +1,36 @@
+{
+  "id": "M12",
+  "slug": "count-per-team",
+  "rev": 1,
+  "difficulty": "medium",
+  "prompt": "작업 폴더의 members.csv에서 team별로 행이 몇 개인지 세어서 team_counts.out에 저장해줘. 형식: <팀>: <숫자> (한 줄에 하나, 팀 이름 알파벳 순)",
+  "fixture": "M12",
+  "format_hint": "<팀>: <숫자> (한 줄에 하나, 팀 이름 알파벳 순)",
+  "outputs": [
+    "team_counts.out"
+  ],
+  "grading": {
+    "grader": "list_file",
+    "params": {
+      "path": "team_counts.out",
+      "expected_items": [
+        "design: 4",
+        "ops: 3",
+        "qa: 5",
+        "sales: 3"
+      ],
+      "item_pattern": "[a-z]+: \\d+"
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 항목은 엄격 일치이고, 항목이 다르면 wrong_value, 항목은 같은데 순서·줄 구성만 지시와 다르면 format_error."
+  },
+  "overlap_with": [],
+  "hand_check": "members.csv는 헤더 + 15행. 팀별 행 수: ['design: 4', 'ops: 3', 'qa: 5', 'sales: 3'] (합 15). 알파벳 순은 design, ops, qa, sales.",
+  "answer": {
+    "items": [
+      "design: 4",
+      "ops: 3",
+      "qa: 5",
+      "sales: 3"
+    ]
+  }
+}

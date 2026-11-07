@@ -1,0 +1,47 @@
+{
+  "id": "M17",
+  "slug": "csv-to-json",
+  "rev": 1,
+  "difficulty": "medium",
+  "prompt": "작업 폴더의 scores.csv를 JSON으로 바꿔 scores.json에 저장해줘. 형식: [{\"name\": \"<이름>\", \"score\": \"<점수>\"}, ...] 처럼 객체 배열이고 모든 값은 문자열이야.",
+  "fixture": "M17",
+  "format_hint": "[{\"name\": \"<이름>\", \"score\": \"<점수>\"}, ...]",
+  "outputs": [
+    "scores.json"
+  ],
+  "grading": {
+    "grader": "json_file",
+    "params": {
+      "path": "scores.json",
+      "expected": [
+        {
+          "name": "한지우",
+          "score": "91"
+        },
+        {
+          "name": "오세민",
+          "score": "67"
+        },
+        {
+          "name": "송하늘",
+          "score": "100"
+        },
+        {
+          "name": "윤재이",
+          "score": "78"
+        },
+        {
+          "name": "강나래",
+          "score": "85"
+        }
+      ]
+    },
+    "allowed": "JSON으로 파싱한 값이 같으면 통과(공백, 줄바꿈, 들여쓰기, 객체 키 순서는 무시). 배열 순서와 값은 엄격. 점수를 문자열 대신 숫자로 쓰는 것 같은 타입 차이는 format_error, 값·키 이름·항목이 다르면 wrong_value.",
+    "loose": [
+      "JSON 객체의 키 순서 무시",
+      "JSON 공백/들여쓰기 무시"
+    ]
+  },
+  "overlap_with": [],
+  "hand_check": "scores.csv는 헤더 `name,score` + 5행. 정답 scores.json은 같은 순서의 객체 5개이고 score는 따옴표로 감싼 문자열: 한지우=91 / 오세민=67 / 송하늘=100 / 윤재이=78 / 강나래=85. 점수 100처럼 세 자리 수도 문자열이다."
+}

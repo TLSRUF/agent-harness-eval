@@ -12,7 +12,9 @@ failure_type
 """
 from __future__ import annotations
 
+import json
 import re
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable
 
@@ -108,7 +110,9 @@ def grade_text_file(workdir: Path, params: dict, fixture_dir: Path, outputs: lis
 def grade_edit_file(workdir: Path, params: dict, fixture_dir: Path, outputs: list[str]) -> dict:
     """파일 안의 한 줄만 바꾸고 나머지는 그대로 두었는지.
 
-    params: path, expected_text(수정 후 전체 내용), target_key(바꿀 줄의 시작 키), value_tokens(선택)
+    params: path, expected_text(수정 후 전체 내용), target_key(바꿀 줄의 시작 키 문자열) 또는 target_keys(여러 키의 목록),
+            value_tokens(선택: 대상 줄에 모두 있어야 하는 값)
+    대상 줄 = 키로 시작하는 줄. 줄을 지우는 과제는 target_key를 지울 줄의 시작 문자열(예: '#')로 쓴다.
     """
     p, err = _output_state(workdir, params["path"])
     if err:
@@ -116,21 +120,29 @@ def grade_edit_file(workdir: Path, params: dict, fixture_dir: Path, outputs: lis
     changed = changed_protected_files(workdir, fixture_dir, outputs)
     if changed:
         return make_result("unexpected_change", f"protected files changed: {changed}")
-    key = params["target_key"]
+    keys = params["target_keys"] if "target_keys" in params else [params["target_key"]]
     actual = normalize_lines(read_text(p))
     expected = normalize_lines(params["expected_text"])
     if actual == expected:
         return make_result("pass")
-    is_target = lambda ln: ln.startswith(key)  # noqa: E731
+    is_target = lambda ln: any(ln.startswith(k) for k in keys)  # noqa: E731
     other_actual = [ln for ln in actual if not is_target(ln)]
     other_expected = [ln for ln in expected if not is_target(ln)]
     target_actual = [ln for ln in actual if is_target(ln)]
-    if other_actual != other_expected or not target_actual:
+    if other_actual != other_expected:
         return make_result("unexpected_change", f"other lines changed: got {actual!r}, expected {expected!r}")
+    for k in keys:  # 키마다: 있어야 하는 대상 줄이 지워졌거나 더 생기면 값이 틀린 것이 아니라 구조가 바뀐 것
+        exp_n = sum(1 for ln in expected if ln.startswith(k))
+        act_n = sum(1 for ln in actual if ln.startswith(k))
+        if exp_n >= 1 and act_n != exp_n:
+            return make_result("unexpected_change", f"lines for key {k!r}: got {act_n}, expected {exp_n}")
+    if not target_actual:
+        return make_result("unexpected_change", f"target lines missing: got {actual!r}, expected {expected!r}")
     tokens = params.get("value_tokens", [])
-    if tokens and all(contains_token(target_actual[0], t) for t in tokens):
-        return make_result("format_error", f"target line value ok but format differs: {target_actual[0]!r}")
-    return make_result("wrong_value", f"target line {target_actual[0]!r}")
+    joined = " ".join(target_actual)
+    if tokens and all(contains_token(joined, t) for t in tokens):
+        return make_result("format_error", f"target line value ok but format differs: {target_actual!r}")
+    return make_result("wrong_value", f"target lines {target_actual!r}")
 
 
 def grade_number_file(workdir: Path, params: dict, fixture_dir: Path, outputs: list[str]) -> dict:
@@ -160,8 +172,118 @@ def grade_number_file(workdir: Path, params: dict, fixture_dir: Path, outputs: l
     return make_result("wrong_value", f"got {text!r}, expected {expected} +/- {tol}")
 
 
+# ---- JSON / 목록 채점기 (Day 5) ----
+
+_NUMERIC = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _canon_scalar(x) -> str:
+    """비교용 표준 문자열. 값이 같으면 타입/표기가 달라도 같은 문자열이 된다.
+
+    숫자(또는 숫자 모양 문자열)는 Decimal로 정규화(88, 88.0, "88", "088", "88.00"이 모두 '88'),
+    bool은 'true'/'false', None은 'null', 그 외 문자열은 그대로.
+    """
+    if isinstance(x, bool):
+        return "true" if x else "false"
+    if x is None:
+        return "null"
+    if isinstance(x, (int, float)) or (isinstance(x, str) and _NUMERIC.fullmatch(x)):
+        return format(Decimal(str(x)).normalize(), "f")
+    return str(x)
+
+
+def _canon(x):
+    if isinstance(x, dict):
+        return {k: _canon(v) for k, v in x.items()}
+    if isinstance(x, list):
+        return [_canon(v) for v in x]
+    return _canon_scalar(x)
+
+
+def _strict_equal(a, b) -> bool:
+    """타입까지 같은 재귀 비교 (5와 "5", 1과 True는 다르다). dict는 키 순서 무시, list는 순서 포함."""
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_strict_equal(a[k], b[k]) for k in a)
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(_strict_equal(x, y) for x, y in zip(a, b))
+    return type(a) is type(b) and a == b
+
+
+def _leaves(x) -> list[str]:
+    if isinstance(x, dict):
+        return [t for v in x.values() for t in _leaves(v)]
+    if isinstance(x, list):
+        return [t for v in x for t in _leaves(v)]
+    return [x if isinstance(x, str) else _canon_scalar(x)]
+
+
+def grade_json_file(workdir: Path, params: dict, fixture_dir: Path, outputs: list[str]) -> dict:
+    """출력 파일이 expected와 같은 JSON인지. 공백, 줄바꿈, 키 순서는 무시한다.
+
+    params: path, expected(JSON 값)
+    - pass: 파싱한 값이 expected와 타입까지 같음 (배열 순서는 내용이다)
+    - format_error: 값은 같은데 타입/표기만 다름 ("5" 대신 5, 88.0), 또는 JSON으로 파싱되지 않지만 expected의 모든 값이 글자로는 들어 있음
+      (끝 쉼표, 작은따옴표, 코드 울타리, BOM, 앞뒤 설명 문구)
+    - wrong_value: 그 밖의 모든 차이 (값, 키 이름, 항목 누락/추가, 배열 순서, 한 겹 감싼 구조)
+    """
+    p, err = _output_state(workdir, params["path"])
+    if err:
+        return make_result("missing_output", err)
+    changed = changed_protected_files(workdir, fixture_dir, outputs)
+    if changed:
+        return make_result("unexpected_change", f"protected files changed: {changed}")
+    text = read_text(p)
+    expected = params["expected"]
+    try:
+        actual = json.loads(text)
+    except ValueError:
+        leaves = _leaves(expected)
+        if leaves and all(contains_token(text, t) for t in leaves):
+            return make_result("format_error", "not valid JSON, but all expected values are present as text")
+        return make_result("wrong_value", "not valid JSON and expected values are missing")
+    if _strict_equal(actual, expected):
+        return make_result("pass")
+    if _canon(actual) == _canon(expected):
+        return make_result("format_error", "values equal but types/number formats differ")
+    return make_result("wrong_value", f"got {json.dumps(actual, ensure_ascii=False)[:200]}")
+
+
+def grade_list_file(workdir: Path, params: dict, fixture_dir: Path, outputs: list[str]) -> dict:
+    """목록 출력 파일. 내용이 다르면 wrong_value, 내용은 같은데 순서/배치만 지시와 다르면 format_error.
+
+    params: path, expected_items(지시한 순서대로 나열), item_pattern(항목 하나를 잡는 정규식, 캡처 그룹 없이),
+            order_is_content(선택, 기본 False: True면 순서가 틀린 것도 wrong_value, 예: 순위)
+    - pass: 줄 단위로 expected_items와 같음 (겉모양 정규화 후)
+    - 출력에서 item_pattern으로 뽑은 항목의 모음(중복 포함)이 expected_items와 다르면 wrong_value
+    - 항목은 같은데 줄 구성이 다름: 순서가 다르거나 쉼표 구분, 접두 문구, 한국어가 붙음 등 -> format_error
+      (단 order_is_content가 True이고 순서가 다르면 wrong_value)
+    항목 경계는 ASCII 기준이며 '.' 뒤에 영숫자가 이어지면 다른 항목이다 (190.5는 190이 아님, a.conf.bak은 a.conf가 아님).
+    """
+    p, err = _output_state(workdir, params["path"])
+    if err:
+        return make_result("missing_output", err)
+    changed = changed_protected_files(workdir, fixture_dir, outputs)
+    if changed:
+        return make_result("unexpected_change", f"protected files changed: {changed}")
+    text = read_text(p)
+    expected = list(params["expected_items"])
+    if normalize_lines(text) == expected:
+        return make_result("pass")
+    pattern = r"(?<![A-Za-z0-9_.\-])(?:" + params["item_pattern"] + r")(?![A-Za-z0-9_\-]|\.[A-Za-z0-9])"
+    found = re.findall(pattern, text)
+    if sorted(found) != sorted(expected):
+        missing = [x for x in expected if x not in found]
+        extra = [x for x in found if x not in expected]
+        return make_result("wrong_value", f"items differ: missing {missing}, unexpected {extra}, got {found}")
+    if found != expected and params.get("order_is_content"):
+        return make_result("wrong_value", f"order is part of the answer: got {found}, expected {expected}")
+    return make_result("format_error", f"same items but layout/order differs: {normalize_lines(text)!r}")
+
+
 GRADERS: dict[str, Callable[[Path, dict, Path, list[str]], dict]] = {
     "text_file": grade_text_file,
     "edit_file": grade_edit_file,
     "number_file": grade_number_file,
+    "json_file": grade_json_file,
+    "list_file": grade_list_file,
 }

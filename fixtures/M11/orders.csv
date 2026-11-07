@@ -1,0 +1,15 @@
+order_id,item,region,qty
+r201,relay,south,3
+r202,router,north,6
+r203,sensor,west,5
+r204,sensor,east,2
+r205,cable,west,2
+r206,fuse,east,8
+r207,router,north,2
+r208,panel,east,6
+r209,relay,north,4
+r210,valve,south,5
+r211,valve,east,8
+r212,sensor,west,3
+r213,switch,east,3
+r214,fuse,west,7

@@ -1,0 +1,42 @@
+{
+  "id": "M16",
+  "slug": "json-to-csv",
+  "rev": 1,
+  "difficulty": "medium",
+  "prompt": "작업 폴더의 people.json에는 사람 5명의 정보가 객체 배열로 들어 있어. 이를 CSV로 바꿔 people.csv에 저장해줘. 형식: 첫 줄은 헤더 id,name,city이고 이어서 사람마다 한 줄, 값에 따옴표는 쓰지 않음",
+  "fixture": "M16",
+  "format_hint": "첫 줄은 헤더 id,name,city이고 이어서 사람마다 한 줄, 값에 따옴표는 쓰지 않음",
+  "outputs": [
+    "people.csv"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "people.csv",
+      "expected_text": "id,name,city\n1,김민준,서울\n2,이서연,부산\n3,박지호,대전\n4,최유나,광주\n5,정도윤,인천",
+      "value_tokens": [
+        "id",
+        "name",
+        "city",
+        "1",
+        "김민준",
+        "서울",
+        "2",
+        "이서연",
+        "부산",
+        "3",
+        "박지호",
+        "대전",
+        "4",
+        "최유나",
+        "광주",
+        "5",
+        "정도윤",
+        "인천"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [],
+  "hand_check": "people.json은 5명의 객체 배열(키 순서 id, name, city). 정답 people.csv는 헤더 `id,name,city` + 5행(배열 순서 그대로): 1,김민준,서울 / 2,이서연,부산 / 3,박지호,대전 / 4,최유나,광주 / 5,정도윤,인천. 값에 쉼표나 따옴표가 필요한 경우는 없다."
+}

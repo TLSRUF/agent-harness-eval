@@ -1,0 +1,20 @@
+{
+  "id": "M07",
+  "seed": 20261107,
+  "answer": {
+    "count": 14
+  },
+  "planted": {
+    "per_file": {
+      "week1.md": 3,
+      "week2.md": 0,
+      "week3.md": 2,
+      "week4.md": 1,
+      "week5.md": 4,
+      "week6.md": 0,
+      "week7.md": 2,
+      "week8.md": 1,
+      "week9.md": 1
+    }
+  }
+}

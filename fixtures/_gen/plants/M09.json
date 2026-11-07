@@ -1,0 +1,21 @@
+{
+  "id": "M09",
+  "seed": 20261109,
+  "answer": {
+    "file": "doc_04.txt"
+  },
+  "planted": {
+    "lines_per_file": {
+      "doc_01.txt": 45,
+      "doc_02.txt": 19,
+      "doc_03.txt": 38,
+      "doc_04.txt": 47,
+      "doc_05.txt": 31,
+      "doc_06.txt": 9,
+      "doc_07.txt": 33,
+      "doc_08.txt": 27,
+      "doc_09.txt": 14,
+      "doc_10.txt": 22
+    }
+  }
+}

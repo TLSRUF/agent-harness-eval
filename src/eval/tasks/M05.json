@@ -1,0 +1,30 @@
+{
+  "id": "M05",
+  "slug": "timeout-and-retry3",
+  "rev": 1,
+  "difficulty": "medium",
+  "prompt": "작업 폴더의 payments.log에는 결제 서비스 로그가 들어 있어. timeout과 retry=3이 둘 다 들어 있는 줄이 모두 몇 줄인지 세어서, both.out에 `줄 수: <숫자>` 형식으로 한 줄만 저장해줘.",
+  "fixture": "M05",
+  "format_hint": "줄 수: <숫자>",
+  "outputs": [
+    "both.out"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "both.out",
+      "expected_text": "줄 수: 17",
+      "value_tokens": [
+        "17"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "search_text|Grep"
+  ],
+  "hand_check": "payments.log는 320줄이고 timeout과 retry=3이 모두 든 줄은 17줄: [16, 17, 36, 53, 59, 65, 75, 96, 116, 154, 161, 185, 230, 233, 252, 275, 306]. 사람이 열어서 확인할 표본: [16번째 줄 `2026-05-06 09:01:31 pay-svc txn=100038 status=timeout retry=3 amount=45.95`]; [116번째 줄 `2026-05-06 09:10:14 pay-svc txn=100297 status=timeout retry=3 amount=31.56`]; [306번째 줄 `2026-05-06 09:25:46 pay-svc txn=100781 status=timeout retry=3 amount=249.05`]; 조건 하나만 맞는 줄(정답 아님): timeout만 [12번째 줄 `2026-05-06 09:01:13 pay-svc txn=100028 status=timeout retry=0 amount=26.48`], retry=3만 [5번째 줄 `2026-05-06 09:00:33 pay-svc txn=100006 status=ok retry=3 amount=212.27`]. retry 값은 0~3 한 자리뿐(retry=30, retry=31 같은 값 없음)이고 timeout은 소문자 status=timeout으로만 나온다(Timeout 같은 변형 없음).",
+  "answer": {
+    "count": 17
+  }
+}

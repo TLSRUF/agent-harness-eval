@@ -1,0 +1,15 @@
+- Collect feedback after the the report demo.
+- Send the agenda for the survey on Monday.
+- Archive the old files from the demo.
+- Review the notes for the launch with the team.
+- Reminder: deadline is on Wednesday for the launch.
+- Update the slides for the audit.
+- Plan the next steps for the launch.
+- Archive the old files from the demo.
+- Plan the next steps for the demo.
+- Plan the next steps for the demo.
+- Ask finance about the budget for the audit.
+- Ask finance about the budget for the demo.
+- Update the slides for the audit.
+- Review the notes for the demo with the team.
+- Collect feedback after the the demo demo.

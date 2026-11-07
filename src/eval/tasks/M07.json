@@ -1,0 +1,30 @@
+{
+  "id": "M07",
+  "slug": "total-deadline-lines",
+  "rev": 1,
+  "difficulty": "medium",
+  "prompt": "작업 폴더에는 주간 메모 파일(.md) 9개가 있어. 모든 파일을 통틀어 deadline이 들어 있는 줄이 모두 몇 줄인지 세어서, total.out에 `줄 수: <숫자>` 형식으로 한 줄만 저장해줘.",
+  "fixture": "M07",
+  "format_hint": "줄 수: <숫자>",
+  "outputs": [
+    "total.out"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "total.out",
+      "expected_text": "줄 수: 14",
+      "value_tokens": [
+        "14"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "search_text|Grep"
+  ],
+  "hand_check": "메모 파일 9개(각 15~25줄)에서 deadline이 든 줄은 파일별 {'week1.md': 3, 'week2.md': 0, 'week3.md': 2, 'week4.md': 1, 'week5.md': 4, 'week6.md': 0, 'week7.md': 2, 'week8.md': 1, 'week9.md': 1}, 합계 14줄. 사람이 열어서 확인할 표본: [week1.md 13번째 줄 `- We missed the deadline for the demo.`]; [week5.md 11번째 줄 `- The deadline for the report moves to Monday.`]; [week9.md 5번째 줄 `- Reminder: deadline is on Wednesday for the launch.`]. 한 줄에 deadline이 두 번 나오는 줄은 없고, deadlines(복수형)나 Deadline 같은 변형도 없다.",
+  "answer": {
+    "count": 14
+  }
+}
