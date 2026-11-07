@@ -51,3 +51,37 @@
 - 숫자: 쉬움 15/15, overlap_with 6/15(search_text|Grep 4, file_stats|Read 2), 로더 --check 문제 0개, pytest 122개 통과, Haiku 확인 3/3 통과(E01·E11·E13, 합계 약 $0.0036).
 - 예측 대조: 사용자 예측 "정답 풀이 1~2개는 채점기 버그로 실패" → 첫 실행 12/12 통과(0건). 버그 3건은 채점 부품 단위 테스트에서 나왔다(프롬프트 검사와 값 판별이 한국어 조사를 못 다룸, 소수의 일부 오인).
 - 다음 할 일: Day 5 보통 과제 17개(overlap_with 늘리기, 같은 규칙), 인코딩 점검의 newline 미지정 28곳은 사용자 확인 후 결정, Day 6 동결 전 MANIFEST.
+
+## Day 5 (2026-11-07) — 채점 부품 단위 테스트 첫 실행 기록 (수정 전)
+- 구현 순서: tests/test_graders_m.py(json_file, edit_file target_keys, list_file)를 구현보다 먼저 작성 -> graders.py 구현 -> 첫 실행. (구현 전 빨간불 실행은 하지 않았다.)
+- 첫 실행(tests/test_graders_m.py): 20개 중 6 실패, 14 통과.
+- 버그 위치 구분:
+  - 채점 부품(graders.py) 1건: edit_file을 여러 키(target_keys)로 일반화하면서, 대상 줄 중 하나를 지워도 다른 대상 줄이 남아 있으면 unexpected_change가 아니라 wrong_value로 분류됨(단일 키는 unexpected_change). 원인: 단일 키용 `not target_actual` 검사를 키별 검사로 일반화하지 않음.
+  - 테스트 코드 5건(과제 코드 아님): make()의 mkdir에 parents=True가 없어 list_file 테스트 5개가 시작도 못 함. 이 때문에 list_file의 논리는 첫 실행에서 검증되지 않았다(가려짐).
+  - 생성기 / 검증 스크립트 / 도구: 아직 구현 전이라 해당 없음.
+- 2차 실행(채점 부품 1건과 테스트 도우미 수정 후): 20개 중 1 실패, 19 통과. 가려졌던 list_file 논리가 처음 실행됨. 실패 1건은 테스트 코드 버그: 중간 빈 줄이 있는 입력("12 / 57 / (빈 줄) / 190")을 pass로 기대했지만, 중간 빈 줄은 내용으로 취급하는 설계(겉모양 관대 기준에 없음)이므로 채점기(format_error)가 맞다. list_file/json_file 논리 자체의 버그는 아직 나오지 않음.
+
+## Day 5 — 생성기 첫 실행 기록 (수정 전)
+- 실행 전 자체 점검에서 발견(실행으로 잡은 것은 아님): 생성기 1건. M06이 설정 키를 12~22개 뽑는데 키 풀이 20개라 random.sample이 예외를 낼 코드였다 -> 범위를 12~19로 고친 뒤 처음 실행.
+- 첫 실행: M01~M06 생성 성공, M07에서 assertion 실패, M08~M17은 도달하지 못함.
+  - 버그 위치 = 생성기의 검증(assert) 코드: re.search(r"(?i)deadlines|Deadline|DEADLINE", ...)에서 맨 앞의 (?i)가 패턴 전체에 적용되어 "Deadline" 대안이 소문자 deadline까지 매치함. fixture 데이터의 문제가 아니라 함정 검사 코드의 오류.
+  - 교훈: 대소문자 변형 검사는 (?i)를 섞지 않고 대문자 변형만 따로 찾는다. (생성기와 별개로 tests/test_m_fixtures.py가 같은 함정을 독립적으로 다시 검사할 예정.)
+
+## Day 5 — fixture/세기 정의 테스트 첫 실행 기록
+- 대상: tests/test_count_definitions.py + tests/test_m_fixtures.py (verify_counts.py, 로더 검증 6번 포함). 첫 실행: 167개 전부 통과, 실패 0건.
+- 사용자 예측("단어 수 과제 M10에서 단어 정의 때문에 새 버그")과 대조: 이 테스트에서는 나타나지 않았다. 세 경로(생성기, verify_counts, file_stats)의 단어 수는 모든 경계 사례(NBSP, 전각 공백, 제어문자 공백, 한국어, 탭/연속 공백)에서 일치했다.
+- 줄 수 정의 불일치 발견(탐침 + 테스트로 고정): file_stats는 str.splitlines()를 써서 낱개 CR, U+2028, U+0085, VT(0x0b), FF(0x0c), FS(0x1c) 같은 특수 줄 구분 문자도 줄로 센다. 생성기와 verify_counts는 
+만 센다. LF/CRLF, 끝 줄바꿈 유무, 빈 줄은 세 경로가 일치. 실제 fixture(E, M 전체)에는 이런 문자가 없고 M09/M10은 끝 줄바꿈 + 빈 줄 없음을 테스트가 보장하므로 정답에는 영향 없음. file_stats는 도구 정의 v1이라 수정하지 않았다(사용자 결정 사항).
+- 버그 위치 종합(Day 5 지금까지): 채점 부품 1(edit_file 다중 키 삭제 분류), 생성기 검증 코드 1(deadline 대소문자 정규식의 (?i) 전역 적용) + 실행 전 자체 점검 1(M06 sample 범위), 테스트 코드 2(mkdir parents, 중간 빈 줄 기대값), 검증 스크립트 0, 도구(file_stats) 0(정의 차이만 기록).
+
+## Day 5 — 정답 풀이 첫 실행 기록 (M01~M17, 수정 전)
+- 명령: `python -m src.eval.loader --check` (정답 풀이 적용 후 채점 + 무작업 채점 + 검증 6).
+- 결과: 정답 풀이 통과 17/17, 실패 0건. 무작업 채점 실패 17/17(M01~M13, M16, M17은 missing_output, M14, M15는 wrong_value: 입력 파일이 출력 파일이라 안 고친 상태가 곧 wrong_value). 검증 6(생성기 값 = 독립 검색 값 = 과제 JSON answer) M01~M13 13/13 일치. 로더 요약: 쉬움 15 + 보통 17 = 32, overlap 16개(search_text|Grep 12, file_stats|Read 4).
+- 음성 대조(임시 복사본에서 fixture를 변조, 레포 불변): M01의 dev-017 한 줄을 dev-018로 바꾸면 [3] 정답 풀이 채점 실패와 [6] 정답 불일치(생성기 23, 독립 검색 22)로 로더가 실패. M10은 처음 변조가 정답을 바꾸지 않아 "감지 못함"이 나왔지만 이는 대조 실험의 설계 오류(기준 미만 파일에 단어를 더함)였고, 경계 파일 19단어를 23단어로 바꾸자 [3]과 [6]이 모두 감지.
+- 수정한 것 없음(첫 실행 통과). 사용자 예측("단어 정의 때문에 M10에서 새 버그")은 이 단계에서도 나타나지 않았다.
+
+## Day 5 일일 기록 (2026-11-07)
+- 한 일: 보통 과제 M01~M17(그래프 과제 없음), fixture 생성기(fixtures/_gen, 시드 고정)와 독립 검색 verify_counts.py, 로더 검증 6번, 새 채점 부품(json_file, list_file, edit_file target_keys), 줄/단어 세기 세 경로 일치 테스트, task_design.md 갱신.
+- 숫자: 32/40(쉬움 15 + 보통 17), overlap 16개(search_text|Grep 12, file_stats|Read 4), 정답 풀이 17/17 통과, 무작업 17/17 실패, 로더 --check 문제 0개, pytest 370개 통과, API 호출 0회.
+- 예측 대조: 사용자 예측 "새 버그가 나올 것, 특히 M10 단어 정의"는 절반만 맞음. 버그는 나왔으나 위치가 달랐다: 채점 부품 1(edit_file 다중 키 삭제 분류), 생성기 검증 코드 1(정규식 (?i) 전역 적용), 테스트 코드 2. 단어 정의(M10, 세 경로)에서는 0건. 대신 file_stats의 줄 세기(splitlines)가 특수 줄 구분 문자에서 다름을 발견(fixture에는 영향 없음).
+- 다음 할 일: Day 6 어려운 과제 8개와 전체 채점 검증, 동결(MANIFEST는 Day 6 끝에 사용자 확인 후). 결정 대기: file_stats 줄 세기 정의 차이 처리, E01~E12 손 대조, 옛 커밋 정리.

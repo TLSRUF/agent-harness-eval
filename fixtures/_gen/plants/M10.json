@@ -1,0 +1,25 @@
+{
+  "id": "M10",
+  "seed": 20261110,
+  "answer": {
+    "items": [
+      "memo_02.txt",
+      "memo_05.txt",
+      "memo_07.txt",
+      "memo_08.txt"
+    ]
+  },
+  "planted": {
+    "words_per_file": {
+      "memo_01.txt": 5,
+      "memo_02.txt": 27,
+      "memo_03.txt": 12,
+      "memo_04.txt": 19,
+      "memo_05.txt": 36,
+      "memo_06.txt": 9,
+      "memo_07.txt": 21,
+      "memo_08.txt": 20
+    },
+    "threshold": 20
+  }
+}

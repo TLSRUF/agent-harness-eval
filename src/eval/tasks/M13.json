@@ -1,0 +1,35 @@
+{
+  "id": "M13",
+  "slug": "top3-by-price",
+  "rev": 1,
+  "difficulty": "medium",
+  "prompt": "작업 폴더의 products.csv에서 price가 가장 높은 product 3개를 찾아 top3.out에 저장해줘. 형식: <product> (한 줄에 하나, 가격이 높은 순)",
+  "fixture": "M13",
+  "format_hint": "<product> (한 줄에 하나, 가격이 높은 순)",
+  "outputs": [
+    "top3.out"
+  ],
+  "grading": {
+    "grader": "list_file",
+    "params": {
+      "path": "top3.out",
+      "expected_items": [
+        "clamp",
+        "vise",
+        "chisel"
+      ],
+      "item_pattern": "[a-z]+",
+      "order_is_content": true
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 순위가 과제 내용이므로 항목이 다르거나 순서가 틀리면 wrong_value, 항목과 순서는 같고 줄 구성(구분자 등)만 다르면 format_error."
+  },
+  "overlap_with": [],
+  "hand_check": "products.csv는 헤더 + 12행, 가격은 모두 다르다. 상위 4개(가격 순): [('clamp', 250), ('vise', 248), ('chisel', 228), ('level', 178)]. 정답은 앞의 3개를 이 순서로.",
+  "answer": {
+    "items": [
+      "clamp",
+      "vise",
+      "chisel"
+    ]
+  }
+}

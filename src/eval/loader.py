@@ -11,6 +11,8 @@
  3. 정답 풀이를 적용하면 채점을 통과한다
  4. 아무것도 안 한 fixture는 채점에서 실패한다
  5. fixture, 채점기, 정답 풀이가 모두 있다
+ 6. (생성기가 만든 과제만, --check) 생성기가 정한 값(fixtures/_gen/plants/<ID>.json) = 독립 검색 스크립트(verify_counts.py)가 센 값
+    = 과제 JSON의 answer. 하나라도 다르면 실패
 추가 필수 항목: ID 형식, format_hint가 프롬프트에 글자 그대로 있음, grading.allowed(허용 기준 한 줄), hand_check.
 """
 from __future__ import annotations
@@ -33,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TASKS_DIR = Path(__file__).resolve().parent / "tasks"
 FIXTURES_DIR = ROOT / "fixtures"
 CRITERIA_DOC = ROOT / "docs" / "task_grading_criteria.md"
+PLANTS_DIR = FIXTURES_DIR / "_gen" / "plants"
 
 ID_RE = re.compile(r"^([EMH])(\d{2})$")
 DIFFICULTY = {"E": "easy", "M": "medium", "H": "hard"}
@@ -46,7 +49,7 @@ LINT_INSENSITIVE = [r"search_text", r"file_stats", r"check_result", r"mcp__",
                     _B0 + r"grep" + _B1, _B0 + r"glob" + _B1, _B0 + r"bash" + _B1]
 LINT_SENSITIVE = [_B0 + r"Read" + _B1, _B0 + r"Write" + _B1, _B0 + r"Edit" + _B1]
 KEYS_REQUIRED = {"id", "slug", "rev", "difficulty", "prompt", "fixture", "outputs", "grading", "overlap_with", "hand_check"}
-KEYS_OPTIONAL = {"format_hint", "status", "_comment"}
+KEYS_OPTIONAL = {"format_hint", "status", "_comment", "answer"}
 
 
 @dataclass
@@ -191,6 +194,37 @@ def _fresh_workdir(task: Task) -> Path:
     return td
 
 
+def check_plant(task: Task, plants_dir: Path = PLANTS_DIR, counters: dict | None = None) -> list[str]:
+    """검증 6: 생성기가 정한 값, 독립 검색 스크립트가 센 값, 과제 JSON의 answer가 모두 같아야 한다.
+
+    plants 파일도 answer 필드도 없는 과제(손으로 만든 과제)는 해당 없음.
+    """
+    plant_path = plants_dir / f"{task.id}.json"
+    has_answer = "answer" in task.raw
+    if not plant_path.exists() and not has_answer:
+        return []
+    errs: list[str] = []
+    if not plant_path.exists():
+        return [f"[6] 과제 JSON에 answer가 있는데 plants 파일이 없음: {plant_path.name}"]
+    if not has_answer:
+        return [f"[6] plants 파일이 있는데 과제 JSON에 answer가 없음: {task.id}"]
+    if counters is None:
+        from . import verify_counts
+        counters = verify_counts.COUNTERS
+    counter = counters.get(task.id)
+    if counter is None:
+        return [f"[6] 독립 검색 스크립트(verify_counts)에 {task.id} 카운터가 없음"]
+    planted = json.loads(plant_path.read_text(encoding="utf-8"))["answer"]
+    try:
+        counted = counter(task.fixture_dir)
+    except Exception as e:  # noqa: BLE001
+        return [f"[6] 독립 검색 스크립트 실행 중 예외: {type(e).__name__}: {e}"]
+    declared = task.raw["answer"]
+    if not (planted == counted == declared):
+        errs.append(f"[6] 정답 불일치: 생성기가 정한 값={planted}, 독립 검색으로 센 값={counted}, 과제 JSON answer={declared}")
+    return errs
+
+
 def check_solution(task: Task) -> list[str]:
     """검증 3(정답 풀이 통과)과 검증 4(무작업 실패)."""
     errs: list[str] = []
@@ -311,6 +345,7 @@ def main(argv: list[str] | None = None) -> int:
         errs = validate_static(t)
         if a.check and not errs:
             errs += check_solution(t)
+            errs += check_plant(t)
         if errs:
             problems[t.id] = errs
     ready = sum(1 for t in tasks if not t.is_todo)

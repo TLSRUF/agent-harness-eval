@@ -1,0 +1,24 @@
+- Review the notes for the audit with the team.
+- Ask finance about the budget for the audit.
+- Book a room for the the budget meeting.
+- Book a room for the the audit meeting.
+- Archive the old files from the report.
+- Send the agenda for the launch on Monday.
+- Update the slides for the launch.
+- Archive the old files from the demo.
+- Review the notes for the report with the team.
+- Update the slides for the audit.
+- Archive the old files from the budget.
+- Plan the next steps for the budget.
+- We missed the deadline for the demo.
+- Send the agenda for the budget on Monday.
+- Reminder: deadline is on Thursday for the demo.
+- Book a room for the the survey meeting.
+- Archive the old files from the audit.
+- Book a room for the the budget meeting.
+- Update the slides for the report.
+- Ask finance about the budget for the launch.
+- Collect feedback after the the demo demo.
+- Reminder: deadline is on Monday for the demo.
+- Ask finance about the budget for the launch.
+- Review the notes for the report with the team.

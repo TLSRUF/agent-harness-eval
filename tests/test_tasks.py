@@ -69,11 +69,22 @@ def test_todo_status_is_skipped_in_summary(tmp_path):
 def test_summary_counts_and_overlap():
     s = summarize(ALL)
     assert "- easy: 15 / 0 / 15" in s
-    assert "- 합계: 15 / 0 / 40" in s
+    assert "- medium: 17 / 0 / 17" in s
+    assert "- hard: 0 / 0 / 8" in s
+    assert "- 합계: 32 / 0 / 40" in s
     assert "미작성(todo)" not in s
-    assert "overlap_with가 있는 과제: 6 / 준비된 15개" in s
-    assert "- search_text|Grep: 4개 (E01, E02, E08, E13)" in s
-    assert "- file_stats|Read: 2개 (E03, E10)" in s
+    assert "overlap_with가 있는 과제: 16 / 준비된 32개" in s
+    assert "- search_text|Grep: 12개 (E01, E02, E08, E13, M01, M02, M03, M04, M05, M06, M07, M08)" in s
+    assert "- file_stats|Read: 4개 (E03, E10, M09, M10)" in s
+
+
+def test_medium_overlap_structure():
+    """보통 17개의 overlap 구성: 검색 8개(search_text|Grep), 통계 2개(file_stats|Read), 나머지 7개는 없음."""
+    med = {t.id: t.overlap_with for t in READY if t.id.startswith("M")}
+    assert sorted(med) == [f"M{i:02d}" for i in range(1, 18)]
+    assert all(med[f"M{i:02d}"] == ["search_text|Grep"] for i in range(1, 9))
+    assert all(med[f"M{i:02d}"] == ["file_stats|Read"] for i in (9, 10))
+    assert all(med[f"M{i:02d}"] == [] for i in range(11, 18))
 
 
 def test_prompts_never_leak_overlap_or_tool_names():
