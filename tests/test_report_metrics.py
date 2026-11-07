@@ -97,39 +97,75 @@ def test_normalize_args_cwd_prefix_needs_a_path_boundary_and_handles_missing_cwd
     assert normalize_args({"k": None, "b": True, "n": 1.5, "s": "한글"}, None)  # 비문자열 값도 처리
 
 
-def test_consistency_pairs_names_and_normalized_args(tmp_path):
-    def calls(cwd, content="x", order=("Grep", "Write")):
+def test_core_args_exclude_content_args_and_keep_selection_args():
+    from src.eval.report import CONTENT_ARG_NAMES, core_args
+    assert CONTENT_ARG_NAMES == {"content", "old_string", "new_string", "contains"}
+    assert core_args({"file_path": "f", "content": "x"}) == {"file_path": "f"}                      # Write
+    assert core_args({"file_path": "f", "old_string": "a", "new_string": "b", "replace_all": True}) == {"file_path": "f", "replace_all": True}  # Edit
+    assert core_args({"pattern": "ERROR", "path": "p", "output_mode": "content", "-n": True}) == {
+        "pattern": "ERROR", "path": "p", "output_mode": "content", "-n": True}                      # Grep
+    assert core_args({"path": "p", "contains": "x", "min_lines": 1}) == {"path": "p", "min_lines": 1}  # check_result
+    assert core_args({"query": "q", "path": "p"}) == {"query": "q", "path": "p"}                    # search_text
+    # 로그에서 이름을 확인하지 못한 인자(Glob, Read의 offset/limit, Grep의 glob/type/-i)는 핵심으로 취급한다
+    assert core_args({"glob": "*.log", "type": "py", "-i": True, "offset": 3, "limit": 10, "head_limit": 5}) == {
+        "glob": "*.log", "type": "py", "-i": True, "offset": 3, "limit": 10, "head_limit": 5}
+    assert core_args({}) == {}
+
+
+def test_consistency_core_args_versus_full_args(tmp_path):
+    def calls(cwd, content="x", pattern="ERROR"):
         sep = "\\" if "\\" in cwd else "/"
-        steps = {"Grep": ("Grep", {"pattern": "ERROR", "path": cwd}, False),
-                 "Write": ("Write", {"file_path": cwd + sep + "result.txt", "content": content}, False)}
-        return [steps[o] for o in order]
+        return [("Grep", {"pattern": pattern, "path": cwd, "output_mode": "content"}, False),
+                ("Write", {"file_path": cwd + sep + "result.txt", "content": content}, False)]
     runs = [
         write_run(tmp_path / "a1.jsonl", "A", calls(r"C:\w\task_1"), cwd=r"C:\w\task_1"),
         write_run(tmp_path / "a2.jsonl", "A", calls("C:/w/task_2"), cwd="C:/w/task_2"),               # 경로 구분자와 임시 폴더만 다름
-        write_run(tmp_path / "a3.jsonl", "A", calls(r"C:\w\task_3", content="y"), cwd=r"C:\w\task_3"),  # 인자(내용)가 다름
-        write_run(tmp_path / "b1.jsonl", "B", [("Read", {"file_path": "f"}, False), ("Write", {"file_path": "g"}, False)]),
-        write_run(tmp_path / "b2.jsonl", "B", [("Write", {"file_path": "g"}, False), ("Read", {"file_path": "f"}, False)]),  # 순서 다름
+        write_run(tmp_path / "a3.jsonl", "A", calls(r"C:\w\task_3", content="y"), cwd=r"C:\w\task_3"),  # Write 내용만 다름
+        write_run(tmp_path / "b1.jsonl", "B", [("Read", {"file_path": "f"}, False), ("Write", {"file_path": "g", "content": "1"}, False)]),
+        write_run(tmp_path / "b2.jsonl", "B", [("Write", {"file_path": "g", "content": "1"}, False), ("Read", {"file_path": "f"}, False)]),  # 순서 다름
+        write_run(tmp_path / "d1.jsonl", "D", calls(r"C:\w\task_1"), cwd=r"C:\w\task_1"),
+        write_run(tmp_path / "d2.jsonl", "D", calls(r"C:\w\task_1", pattern="WARN"), cwd=r"C:\w\task_1"),  # 검색어(핵심 인자)가 다름
         write_run(tmp_path / "c1.jsonl", "C", calls(r"C:\w\task_1"), cwd=r"C:\w\task_1"),              # 1회뿐이라 제외
     ]
     ln = line(build_report(runs), "일관성")
-    # A: (1,2) 이름O 인자O, (1,3) 이름O 인자X, (2,3) 이름O 인자X / B: (1,2) 이름X 인자X -> 이름 3/4, 인자까지 1/4
-    assert "(a) 도구 이름 순서 일치 75%" in ln and "(b) 이름과 정규화한 인자까지 일치 25%" in ln
-    assert "비교한 쌍 4개" in ln and "N=2, 과제당 2~3회(최소 2회) / 총 5건" in ln and WARN in ln
+    # 쌍: A 3개(1-2, 1-3, 2-3), B 1개, D 1개 = 5개
+    # (a) 이름 순서: A 3/3, B 0/1, D 1/1 -> 4/5 = 80%
+    # (b) 이름+핵심 인자: A 3/3(Write 내용은 제외하므로 a3도 같음), B 0, D 0(검색어 다름) -> 3/5 = 60%
+    # (c) 이름+전체 인자(참고): A는 1-2만 같음(내용이 다른 a3 제외), B 0, D 0 -> 1/5 = 20%
+    assert "(a) 도구 이름 순서 일치 80%" in ln
+    assert "(b) 이름과 핵심 인자까지 일치 60%" in ln
+    assert "(c) 참고: 전체 인자까지 일치 20%" in ln
+    assert "비교한 쌍 5개" in ln and "N=3, 과제당 2~3회(최소 2회) / 총 7건" in ln and WARN in ln
+    assert ln.index("(a)") < ln.index("(b)") < ln.index("(c)")
+
+
+def test_consistency_edit_strings_are_content_args(tmp_path):
+    def run(i, old, new, replace_all=False):
+        return write_run(tmp_path / f"e{i}.jsonl", "E", [
+            ("Read", {"file_path": "f"}, False),
+            ("Edit", {"file_path": "f", "old_string": old, "new_string": new, "replace_all": replace_all}, False)])
+    same_core = [run(1, "a", "b"), run(2, "cat", "dog")]                    # old/new_string만 다름
+    ln = line(build_report(same_core), "일관성")
+    assert "(b) 이름과 핵심 인자까지 일치 100%" in ln and "(c) 참고: 전체 인자까지 일치 0%" in ln
+    diff_core = [run(1, "a", "b", False), run(2, "a", "b", True)]            # replace_all은 편집 방식을 정하는 옵션이라 핵심으로 본다
+    ln = line(build_report(diff_core), "일관성")
+    assert "(b) 이름과 핵심 인자까지 일치 0%" in ln and "(c) 참고: 전체 인자까지 일치 0%" in ln
 
 
 def test_consistency_all_identical_and_no_repeats(tmp_path):
     same = [("Read", {"file_path": r"C:\w\task_a\f"}, False), ("Write", {"file_path": r"C:\w\task_a\o", "content": "z"}, False)]
     runs = [write_run(tmp_path / f"r{i}.jsonl", "T", same) for i in range(3)]
     ln = line(build_report(runs), "일관성")
-    assert "(a) 도구 이름 순서 일치 100%" in ln and "(b) 이름과 정규화한 인자까지 일치 100%" in ln and "비교한 쌍 3개" in ln
+    assert "(a) 도구 이름 순서 일치 100%" in ln and "(b) 이름과 핵심 인자까지 일치 100%" in ln
+    assert "(c) 참고: 전체 인자까지 일치 100%" in ln and "비교한 쌍 3개" in ln
     ln2 = line(build_report([write_run(tmp_path / "solo.jsonl", "S", same)]), "일관성")
-    assert "n/a" in ln2 and "N=0, 과제당 0회 / 총 0건" in ln2 and "비교한 쌍 0개" in ln2
+    assert ln2.count("n/a") == 3 and "N=0, 과제당 0회 / 총 0건" in ln2 and "비교한 쌍 0개" in ln2
 
 
 def test_consistency_without_tool_calls_counts_as_identical(tmp_path):
     runs = [write_run(tmp_path / f"e{i}.jsonl", "E", []) for i in range(2)]
     ln = line(build_report(runs), "일관성")
-    assert "(a) 도구 이름 순서 일치 100%" in ln and "(b) 이름과 정규화한 인자까지 일치 100%" in ln
+    assert "(a) 도구 이름 순서 일치 100%" in ln and "(b) 이름과 핵심 인자까지 일치 100%" in ln
 
 
 # ---------------- 도구 오류율 (커스텀/내장 구분) ----------------

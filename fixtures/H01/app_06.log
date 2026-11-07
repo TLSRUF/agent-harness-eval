@@ -1,0 +1,261 @@
+2026-06-01 09:00:07 WARN slow query took 297ms on shard-7
+2026-06-01 09:00:10 ERROR upstream timeout after 806ms retrying
+2026-06-01 09:00:11 ERROR upstream timeout after 731ms retrying
+2026-06-01 09:00:12 INFO request 379 served status=404
+2026-06-01 09:00:14 WARN slow query took 222ms on shard-9
+2026-06-01 09:00:16 ERROR upstream timeout after 563ms retrying
+2026-06-01 09:00:23 WARN slow query took 290ms on shard-9
+2026-06-01 09:00:26 DEBUG cache hit key=712
+2026-06-01 09:00:30 INFO request 256 served status=500
+2026-06-01 09:00:38 DEBUG cache hit key=121
+2026-06-01 09:00:41 ERROR upstream timeout after 513ms retrying
+2026-06-01 09:00:46 WARN slow query took 87ms on shard-9
+2026-06-01 09:00:51 ERROR upstream timeout after 111ms retrying
+2026-06-01 09:00:57 WARN slow query took 408ms on shard-5
+2026-06-01 09:00:58 DEBUG cache hit key=229
+2026-06-01 09:01:05 ERROR upstream timeout after 893ms retrying
+2026-06-01 09:01:12 WARN slow query took 674ms on shard-8
+2026-06-01 09:01:14 DEBUG cache hit key=132
+2026-06-01 09:01:23 ERROR upstream timeout after 173ms retrying
+2026-06-01 09:01:24 WARN slow query took 534ms on shard-9
+2026-06-01 09:01:33 DEBUG cache hit key=839
+2026-06-01 09:01:34 INFO request 186 served status=404
+2026-06-01 09:01:39 WARN slow query took 580ms on shard-1
+2026-06-01 09:01:40 INFO worker-8 job 418 done in 214ms
+2026-06-01 09:01:43 WARN slow query took 802ms on shard-1
+2026-06-01 09:01:50 DEBUG cache hit key=876
+2026-06-01 09:01:56 WARN slow query took 790ms on shard-8
+2026-06-01 09:02:01 INFO request 596 served status=500
+2026-06-01 09:02:09 ERROR upstream timeout after 779ms retrying
+2026-06-01 09:02:14 INFO request 971 served status=200
+2026-06-01 09:02:18 INFO worker-3 job 817 done in 736ms
+2026-06-01 09:02:25 INFO worker-8 job 559 done in 649ms
+2026-06-01 09:02:30 ERROR upstream timeout after 429ms retrying
+2026-06-01 09:02:35 DEBUG cache hit key=853
+2026-06-01 09:02:38 ERROR upstream timeout after 301ms retrying
+2026-06-01 09:02:39 INFO heartbeat ok
+2026-06-01 09:02:44 ERROR upstream timeout after 352ms retrying
+2026-06-01 09:02:53 WARN slow query took 160ms on shard-7
+2026-06-01 09:02:59 ERROR upstream timeout after 70ms retrying
+2026-06-01 09:03:03 INFO request 454 served status=200
+2026-06-01 09:03:11 ERROR upstream timeout after 547ms retrying
+2026-06-01 09:03:20 WARN slow query took 367ms on shard-8
+2026-06-01 09:03:28 WARN slow query took 580ms on shard-1
+2026-06-01 09:03:31 INFO request 486 served status=200
+2026-06-01 09:03:32 WARN slow query took 714ms on shard-7
+2026-06-01 09:03:35 ERROR upstream timeout after 634ms retrying
+2026-06-01 09:03:43 DEBUG cache hit key=294
+2026-06-01 09:03:51 INFO worker-8 job 445 done in 789ms
+2026-06-01 09:03:54 ERROR upstream timeout after 521ms retrying
+2026-06-01 09:03:57 WARN slow query took 25ms on shard-3
+2026-06-01 09:04:03 ERROR upstream timeout after 776ms retrying
+2026-06-01 09:04:11 WARN slow query took 194ms on shard-1
+2026-06-01 09:04:14 WARN slow query took 900ms on shard-8
+2026-06-01 09:04:17 INFO worker-2 job 945 done in 15ms
+2026-06-01 09:04:26 INFO request 386 served status=404
+2026-06-01 09:04:30 INFO request 519 served status=200
+2026-06-01 09:04:36 INFO heartbeat ok
+2026-06-01 09:04:42 DEBUG cache hit key=524
+2026-06-01 09:04:47 ERROR upstream timeout after 115ms retrying
+2026-06-01 09:04:50 DEBUG cache hit key=280
+2026-06-01 09:04:56 WARN slow query took 819ms on shard-5
+2026-06-01 09:05:01 ERROR upstream timeout after 858ms retrying
+2026-06-01 09:05:08 DEBUG cache hit key=268
+2026-06-01 09:05:12 INFO worker-2 job 544 done in 673ms
+2026-06-01 09:05:14 WARN slow query took 461ms on shard-4
+2026-06-01 09:05:22 DEBUG cache hit key=802
+2026-06-01 09:05:24 INFO heartbeat ok
+2026-06-01 09:05:28 INFO request 866 served status=200
+2026-06-01 09:05:30 INFO request 507 served status=500
+2026-06-01 09:05:33 ERROR upstream timeout after 788ms retrying
+2026-06-01 09:05:42 WARN slow query took 82ms on shard-2
+2026-06-01 09:05:48 WARN slow query took 315ms on shard-1
+2026-06-01 09:05:54 INFO request 734 served status=404
+2026-06-01 09:06:03 INFO request 675 served status=200
+2026-06-01 09:06:11 INFO request 417 served status=200
+2026-06-01 09:06:18 INFO request 647 served status=404
+2026-06-01 09:06:26 INFO worker-3 job 479 done in 711ms
+2026-06-01 09:06:33 ERROR upstream timeout after 96ms retrying
+2026-06-01 09:06:35 ERROR upstream timeout after 651ms retrying
+2026-06-01 09:06:36 DEBUG cache hit key=167
+2026-06-01 09:06:40 WARN slow query took 530ms on shard-4
+2026-06-01 09:06:48 DEBUG cache hit key=322
+2026-06-01 09:06:51 INFO request 186 served status=404
+2026-06-01 09:07:00 WARN slow query took 526ms on shard-1
+2026-06-01 09:07:07 INFO request 930 served status=404
+2026-06-01 09:07:15 DEBUG cache hit key=559
+2026-06-01 09:07:19 INFO request 391 served status=500
+2026-06-01 09:07:28 WARN slow query took 538ms on shard-1
+2026-06-01 09:07:34 INFO request 129 served status=404
+2026-06-01 09:07:35 ERROR upstream timeout after 474ms retrying
+2026-06-01 09:07:38 INFO request 939 served status=500
+2026-06-01 09:07:45 WARN slow query took 139ms on shard-6
+2026-06-01 09:07:46 ERROR upstream timeout after 475ms retrying
+2026-06-01 09:07:48 DEBUG cache hit key=814
+2026-06-01 09:07:49 ERROR upstream timeout after 720ms retrying
+2026-06-01 09:07:57 INFO request 905 served status=500
+2026-06-01 09:08:03 INFO request 962 served status=200
+2026-06-01 09:08:09 DEBUG cache hit key=831
+2026-06-01 09:08:15 ERROR upstream timeout after 482ms retrying
+2026-06-01 09:08:19 DEBUG cache hit key=741
+2026-06-01 09:08:26 WARN slow query took 255ms on shard-4
+2026-06-01 09:08:30 WARN slow query took 742ms on shard-3
+2026-06-01 09:08:33 INFO request 505 served status=200
+2026-06-01 09:08:39 INFO heartbeat ok
+2026-06-01 09:08:45 ERROR upstream timeout after 546ms retrying
+2026-06-01 09:08:49 WARN slow query took 226ms on shard-1
+2026-06-01 09:08:56 ERROR upstream timeout after 331ms retrying
+2026-06-01 09:09:04 INFO request 211 served status=500
+2026-06-01 09:09:12 ERROR upstream timeout after 535ms retrying
+2026-06-01 09:09:13 ERROR upstream timeout after 303ms retrying
+2026-06-01 09:09:18 INFO request 323 served status=200
+2026-06-01 09:09:21 ERROR upstream timeout after 143ms retrying
+2026-06-01 09:09:27 WARN slow query took 193ms on shard-9
+2026-06-01 09:09:29 WARN slow query took 505ms on shard-2
+2026-06-01 09:09:35 INFO request 194 served status=200
+2026-06-01 09:09:37 WARN slow query took 510ms on shard-2
+2026-06-01 09:09:39 DEBUG cache hit key=551
+2026-06-01 09:09:43 INFO request 118 served status=200
+2026-06-01 09:09:52 WARN slow query took 155ms on shard-2
+2026-06-01 09:09:53 ERROR upstream timeout after 368ms retrying
+2026-06-01 09:09:56 WARN slow query took 110ms on shard-5
+2026-06-01 09:09:59 WARN slow query took 387ms on shard-8
+2026-06-01 09:10:02 INFO request 681 served status=200
+2026-06-01 09:10:09 DEBUG cache hit key=244
+2026-06-01 09:10:10 ERROR upstream timeout after 323ms retrying
+2026-06-01 09:10:19 WARN slow query took 565ms on shard-2
+2026-06-01 09:10:25 DEBUG cache hit key=471
+2026-06-01 09:10:28 INFO worker-3 job 814 done in 433ms
+2026-06-01 09:10:32 INFO heartbeat ok
+2026-06-01 09:10:41 WARN slow query took 374ms on shard-7
+2026-06-01 09:10:48 DEBUG cache hit key=177
+2026-06-01 09:10:52 DEBUG cache hit key=348
+2026-06-01 09:10:55 WARN slow query took 609ms on shard-8
+2026-06-01 09:10:59 WARN slow query took 690ms on shard-1
+2026-06-01 09:11:07 INFO request 502 served status=404
+2026-06-01 09:11:15 WARN slow query took 833ms on shard-7
+2026-06-01 09:11:18 ERROR upstream timeout after 171ms retrying
+2026-06-01 09:11:23 WARN slow query took 575ms on shard-8
+2026-06-01 09:11:27 ERROR upstream timeout after 283ms retrying
+2026-06-01 09:11:28 WARN slow query took 389ms on shard-5
+2026-06-01 09:11:34 DEBUG cache hit key=126
+2026-06-01 09:11:38 WARN slow query took 833ms on shard-4
+2026-06-01 09:11:43 ERROR upstream timeout after 235ms retrying
+2026-06-01 09:11:52 INFO request 191 served status=500
+2026-06-01 09:11:53 DEBUG cache hit key=138
+2026-06-01 09:12:00 ERROR upstream timeout after 781ms retrying
+2026-06-01 09:12:06 WARN slow query took 149ms on shard-3
+2026-06-01 09:12:10 DEBUG cache hit key=364
+2026-06-01 09:12:14 INFO worker-6 job 705 done in 508ms
+2026-06-01 09:12:15 WARN slow query took 247ms on shard-8
+2026-06-01 09:12:16 INFO request 232 served status=500
+2026-06-01 09:12:19 ERROR upstream timeout after 516ms retrying
+2026-06-01 09:12:23 DEBUG cache hit key=308
+2026-06-01 09:12:25 WARN slow query took 110ms on shard-6
+2026-06-01 09:12:29 INFO heartbeat ok
+2026-06-01 09:12:35 INFO request 693 served status=200
+2026-06-01 09:12:38 INFO worker-5 job 421 done in 586ms
+2026-06-01 09:12:45 WARN slow query took 212ms on shard-9
+2026-06-01 09:12:50 INFO heartbeat ok
+2026-06-01 09:12:57 INFO request 724 served status=200
+2026-06-01 09:13:06 DEBUG cache hit key=440
+2026-06-01 09:13:12 INFO request 967 served status=200
+2026-06-01 09:13:20 INFO worker-8 job 392 done in 19ms
+2026-06-01 09:13:28 DEBUG cache hit key=278
+2026-06-01 09:13:35 ERROR upstream timeout after 537ms retrying
+2026-06-01 09:13:44 ERROR upstream timeout after 485ms retrying
+2026-06-01 09:13:50 INFO request 639 served status=200
+2026-06-01 09:13:58 INFO request 147 served status=404
+2026-06-01 09:14:06 WARN slow query took 580ms on shard-4
+2026-06-01 09:14:07 INFO request 275 served status=404
+2026-06-01 09:14:10 INFO request 705 served status=200
+2026-06-01 09:14:11 INFO request 586 served status=200
+2026-06-01 09:14:14 DEBUG cache hit key=779
+2026-06-01 09:14:17 INFO worker-9 job 684 done in 75ms
+2026-06-01 09:14:23 DEBUG cache hit key=712
+2026-06-01 09:14:31 INFO heartbeat ok
+2026-06-01 09:14:36 WARN slow query took 365ms on shard-3
+2026-06-01 09:14:45 WARN slow query took 475ms on shard-6
+2026-06-01 09:14:46 ERROR upstream timeout after 110ms retrying
+2026-06-01 09:14:51 ERROR upstream timeout after 175ms retrying
+2026-06-01 09:14:53 ERROR upstream timeout after 211ms retrying
+2026-06-01 09:14:54 WARN slow query took 414ms on shard-9
+2026-06-01 09:15:03 WARN slow query took 208ms on shard-4
+2026-06-01 09:15:10 WARN slow query took 300ms on shard-3
+2026-06-01 09:15:11 INFO worker-7 job 315 done in 198ms
+2026-06-01 09:15:17 INFO request 867 served status=500
+2026-06-01 09:15:18 INFO heartbeat ok
+2026-06-01 09:15:22 WARN slow query took 594ms on shard-9
+2026-06-01 09:15:29 WARN slow query took 564ms on shard-3
+2026-06-01 09:15:35 WARN slow query took 589ms on shard-3
+2026-06-01 09:15:44 INFO worker-5 job 700 done in 566ms
+2026-06-01 09:15:53 WARN slow query took 235ms on shard-2
+2026-06-01 09:16:02 DEBUG cache hit key=913
+2026-06-01 09:16:04 ERROR upstream timeout after 897ms retrying
+2026-06-01 09:16:10 WARN slow query took 296ms on shard-8
+2026-06-01 09:16:19 INFO worker-3 job 649 done in 175ms
+2026-06-01 09:16:26 DEBUG cache hit key=301
+2026-06-01 09:16:27 DEBUG cache hit key=240
+2026-06-01 09:16:31 DEBUG cache hit key=469
+2026-06-01 09:16:37 ERROR upstream timeout after 708ms retrying
+2026-06-01 09:16:39 WARN slow query took 475ms on shard-6
+2026-06-01 09:16:44 INFO heartbeat ok
+2026-06-01 09:16:51 WARN slow query took 38ms on shard-4
+2026-06-01 09:16:53 INFO request 945 served status=200
+2026-06-01 09:16:59 ERROR upstream timeout after 600ms retrying
+2026-06-01 09:17:01 WARN slow query took 178ms on shard-5
+2026-06-01 09:17:08 WARN slow query took 139ms on shard-6
+2026-06-01 09:17:10 ERROR upstream timeout after 385ms retrying
+2026-06-01 09:17:13 WARN slow query took 192ms on shard-2
+2026-06-01 09:17:22 DEBUG cache hit key=528
+2026-06-01 09:17:24 ERROR upstream timeout after 656ms retrying
+2026-06-01 09:17:33 INFO request 525 served status=200
+2026-06-01 09:17:34 ERROR upstream timeout after 640ms retrying
+2026-06-01 09:17:35 INFO worker-6 job 706 done in 191ms
+2026-06-01 09:17:42 WARN slow query took 97ms on shard-6
+2026-06-01 09:17:44 DEBUG cache hit key=776
+2026-06-01 09:17:51 WARN slow query took 739ms on shard-2
+2026-06-01 09:17:52 INFO request 686 served status=200
+2026-06-01 09:17:55 ERROR upstream timeout after 553ms retrying
+2026-06-01 09:18:03 INFO request 779 served status=500
+2026-06-01 09:18:06 ERROR upstream timeout after 309ms retrying
+2026-06-01 09:18:07 INFO worker-2 job 302 done in 846ms
+2026-06-01 09:18:08 INFO heartbeat ok
+2026-06-01 09:18:11 WARN slow query took 406ms on shard-3
+2026-06-01 09:18:14 DEBUG cache hit key=535
+2026-06-01 09:18:22 INFO request 678 served status=200
+2026-06-01 09:18:23 WARN slow query took 151ms on shard-1
+2026-06-01 09:18:25 ERROR upstream timeout after 688ms retrying
+2026-06-01 09:18:31 WARN slow query took 536ms on shard-6
+2026-06-01 09:18:36 ERROR upstream timeout after 515ms retrying
+2026-06-01 09:18:41 ERROR upstream timeout after 138ms retrying
+2026-06-01 09:18:46 INFO request 536 served status=200
+2026-06-01 09:18:53 ERROR upstream timeout after 877ms retrying
+2026-06-01 09:19:02 ERROR upstream timeout after 873ms retrying
+2026-06-01 09:19:11 INFO worker-8 job 393 done in 572ms
+2026-06-01 09:19:20 WARN slow query took 103ms on shard-5
+2026-06-01 09:19:25 INFO request 339 served status=200
+2026-06-01 09:19:28 ERROR upstream timeout after 493ms retrying
+2026-06-01 09:19:30 INFO request 973 served status=200
+2026-06-01 09:19:34 WARN slow query took 37ms on shard-9
+2026-06-01 09:19:43 INFO request 701 served status=200
+2026-06-01 09:19:50 ERROR upstream timeout after 755ms retrying
+2026-06-01 09:19:56 INFO request 594 served status=404
+2026-06-01 09:20:00 INFO request 188 served status=500
+2026-06-01 09:20:02 INFO worker-8 job 519 done in 207ms
+2026-06-01 09:20:03 DEBUG cache hit key=211
+2026-06-01 09:20:09 DEBUG cache hit key=309
+2026-06-01 09:20:16 DEBUG cache hit key=574
+2026-06-01 09:20:20 INFO heartbeat ok
+2026-06-01 09:20:24 ERROR upstream timeout after 250ms retrying
+2026-06-01 09:20:25 WARN slow query took 778ms on shard-4
+2026-06-01 09:20:33 INFO worker-6 job 354 done in 799ms
+2026-06-01 09:20:34 ERROR upstream timeout after 145ms retrying
+2026-06-01 09:20:36 ERROR upstream timeout after 349ms retrying
+2026-06-01 09:20:40 WARN slow query took 147ms on shard-5
+2026-06-01 09:20:49 INFO worker-6 job 429 done in 585ms
+2026-06-01 09:20:53 ERROR upstream timeout after 8ms retrying
+2026-06-01 09:21:00 INFO request 908 served status=200
+2026-06-01 09:21:06 INFO request 656 served status=500
+2026-06-01 09:21:13 ERROR upstream timeout after 597ms retrying
+2026-06-01 09:21:21 WARN slow query took 155ms on shard-2

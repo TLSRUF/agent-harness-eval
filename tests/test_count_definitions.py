@@ -75,6 +75,31 @@ def test_known_line_divergence_is_documented_not_silent(tmp_path, label):
     assert f[0] > g[0], (label, g, f)       # file_stats만 줄을 더 센다
 
 
+def three_byte_counts(tmp_path: Path, data: bytes):
+    """바이트 수를 세 경로로 센다: 생성기 쪽(len(text.encode)), verify_counts(len(read_bytes)), file_stats 도구(st_size)."""
+    p = tmp_path / "t.txt"
+    p.write_bytes(data)
+    g = len(data.decode("utf-8").encode("utf-8"))
+    v = verify_counts.count_bytes(p)
+    m = re.search(r"bytes=(\d+)", file_stats_impl(tmp_path, "t.txt")["content"][0]["text"])
+    return g, v, int(m.group(1))
+
+
+@pytest.mark.parametrize("label,data", [
+    ("ascii", b"abc\n"), ("빈 파일", b""), ("한글(3바이트 문자)", "한글 텍스트\n".encode("utf-8")), ("한글과 ASCII", "가a나b\n".encode("utf-8")),
+    ("CRLF(줄바꿈 2바이트)", b"a\r\nb\r\n"), ("끝 줄바꿈 없음", "한글".encode("utf-8"))])
+def test_byte_counts_agree_across_three_paths(tmp_path, label, data):
+    g, v, f = three_byte_counts(tmp_path, data)
+    assert g == v == f == len(data), (label, g, v, f)
+
+
+def test_byte_counts_agree_on_every_fixture_file(tmp_path):
+    """H08이 바이트 수를 비교하므로 모든 fixture 파일에서 세 경로의 바이트 수가 같아야 한다."""
+    for path in M_FILES:
+        g, v, f = three_byte_counts(tmp_path, path.read_bytes())
+        assert g == v == f == path.stat().st_size, path
+
+
 def test_words_agree_even_with_exotic_whitespace(tmp_path):
     for data in (b"a\x1cb c\n", "a b c\n".encode("utf-8"), "a\u0085b\n".encode("utf-8"), b"a\x0bb\x0cc\n"):
         g, v, f = three_counts(tmp_path, data)

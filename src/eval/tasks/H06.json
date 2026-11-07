@@ -1,0 +1,71 @@
+{
+  "id": "H06",
+  "slug": "cross-reference-most-orders",
+  "rev": 1,
+  "difficulty": "hard",
+  "prompt": "작업 폴더에는 customers.csv(id,name,tier)와 orders.csv(order_id,customer_id,qty)가 있어. customers.csv에 있는 고객 중 주문(orders.csv의 행)이 가장 많은 고객의 이름을 top_customer.out에 `고객: <이름>` 형식으로 한 줄만 저장해줘. orders.csv의 customer_id가 customers.csv에 없는 주문은 세지 않아.",
+  "fixture": "H06",
+  "format_hint": "고객: <이름>",
+  "outputs": [
+    "top_customer.out"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "top_customer.out",
+      "expected_text": "고객: Alma",
+      "value_tokens": [
+        "Alma"
+      ],
+      "forbid_tokens": [
+        "Aldo",
+        "Brent",
+        "Bruna",
+        "Cleo",
+        "Cyrus",
+        "Dana",
+        "Dmitri",
+        "Elio",
+        "Esme",
+        "Farid",
+        "Fern",
+        "Gael",
+        "Greta",
+        "Hana",
+        "Hugo",
+        "Ines",
+        "Ivor",
+        "Jade",
+        "Jonas",
+        "Kira",
+        "Knut",
+        "Lazlo",
+        "Lena",
+        "Milo",
+        "Mona",
+        "Nils",
+        "Nora",
+        "Olga",
+        "Pablo",
+        "Quinn",
+        "Rosa",
+        "Silas",
+        "Tara",
+        "Uriel",
+        "Vera",
+        "Wilf",
+        "Xena",
+        "Yusuf",
+        "Zora"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [],
+  "hand_check": "customers.csv는 고객 40명(c001~c040), orders.csv는 주문 60행. 목록에 있는 고객 중 최다는 c027(Alma) 8건, 2등 c026 6건. 함정: 목록에 없는 id c099가 11건으로 전체 최다이지만 세지 않는다(프롬프트 규칙). 사람이 확인하는 방법: orders.csv에서 `c027`가 든 행을 세어 8건인지, `c099`가 11건이고 customers.csv에 없는지 확인.",
+  "answer": {
+    "name": "Alma"
+  },
+  "min_steps": 3,
+  "min_steps_basis": "읽기 2(customers.csv, orders.csv) + 쓰기 1. 검색 2 + 쓰기 1 경로도 3"
+}

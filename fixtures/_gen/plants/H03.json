@@ -1,0 +1,14 @@
+{
+  "id": "H03",
+  "seed": 20261120,
+  "answer": {
+    "port": 8443
+  },
+  "planted": {
+    "latest": "2026-03-14",
+    "tied_files": [
+      "ops_guide.md",
+      "runbook.md"
+    ]
+  }
+}

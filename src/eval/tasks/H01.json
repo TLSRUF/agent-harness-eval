@@ -1,0 +1,39 @@
+{
+  "id": "H01",
+  "slug": "top3-by-word-count",
+  "rev": 1,
+  "difficulty": "hard",
+  "prompt": "작업 폴더에는 로그 파일(.log) 10개가 있어. 단어 수가 가장 많은 파일 3개를 찾아 top_words.out에 저장해줘. 형식: <파일명>: <단어 수> (한 줄에 하나, 단어 수가 많은 순). 단어는 공백으로 구분되는 덩어리야.",
+  "fixture": "H01",
+  "format_hint": "<파일명>: <단어 수> (한 줄에 하나, 단어 수가 많은 순)",
+  "outputs": [
+    "top_words.out"
+  ],
+  "grading": {
+    "grader": "list_file",
+    "params": {
+      "path": "top_words.out",
+      "expected_items": [
+        "app_07.log: 2675",
+        "app_03.log: 2493",
+        "app_05.log: 2306"
+      ],
+      "item_pattern": "[a-z_0-9]+\\.log: \\d+",
+      "order_is_content": true
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 순위가 과제 내용이므로 항목이 다르거나 순서가 틀리면 wrong_value, 항목과 순서는 같고 줄 구성(구분자 등)만 다르면 format_error."
+  },
+  "overlap_with": [
+    "file_stats|Read"
+  ],
+  "hand_check": "로그 파일 10개(각 150~400줄)의 단어 수(공백으로 구분한 덩어리): {'app_01.log': 1333, 'app_02.log': 1514, 'app_03.log': 2493, 'app_04.log': 1149, 'app_05.log': 2306, 'app_06.log': 2010, 'app_07.log': 2675, 'app_08.log': 1533, 'app_09.log': 2270, 'app_10.log': 1276}. 줄 수: {'app_01.log': 182, 'app_02.log': 215, 'app_03.log': 347, 'app_04.log': 156, 'app_05.log': 298, 'app_06.log': 261, 'app_07.log': 389, 'app_08.log': 204, 'app_09.log': 327, 'app_10.log': 176}. 단어 수 상위 3개는 ['app_07.log: 2675', 'app_03.log: 2493', 'app_05.log: 2306']이고, 줄 수 상위 3개는 ['app_07.log', 'app_03.log', 'app_09.log']로 달라서 줄 수 순위로 답하면 틀린다. 1~4등 사이는 모두 25단어 이상 차이 나고 단어 수 동률은 없다. 사람이 확인하는 방법: 각 파일에 `wc -w`(단어 수)와 `wc -l`(줄 수)을 실행해 위 표와 대조. 표본: 1등 파일의 단어 수가 위 표의 값과 같은지.",
+  "answer": {
+    "items": [
+      "app_07.log: 2675",
+      "app_03.log: 2493",
+      "app_05.log: 2306"
+    ]
+  },
+  "min_steps": 11,
+  "min_steps_basis": "통계 10(파일 10개의 단어 수) + 쓰기 1. 단어 수를 검색 도구로 한 번에 세는 우회는 알려진 것이 없음(가설: 확인 불가)"
+}

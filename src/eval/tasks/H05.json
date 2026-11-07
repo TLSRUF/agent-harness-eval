@@ -1,0 +1,65 @@
+{
+  "id": "H05",
+  "slug": "bulk-endpoint-replace",
+  "rev": 1,
+  "difficulty": "hard",
+  "prompt": "작업 폴더에는 설정 파일(.conf) 10개가 있어. 키가 정확히 endpoint이고 값이 정확히 http://old.internal:8080인 줄을 찾아 `endpoint = http://new.internal:9090`으로 바꿔줘. `#`으로 시작하는 줄, backup_endpoint 같은 다른 키, 값이 조금이라도 다른 줄은 그대로 두고, 같은 파일에 저장해줘. 나머지 줄은 전혀 바꾸지 마.",
+  "fixture": "H05",
+  "format_hint": "endpoint = http://new.internal:9090",
+  "outputs": [
+    "svc_01.conf",
+    "svc_02.conf",
+    "svc_03.conf",
+    "svc_04.conf",
+    "svc_05.conf",
+    "svc_06.conf",
+    "svc_07.conf",
+    "svc_08.conf",
+    "svc_09.conf",
+    "svc_10.conf"
+  ],
+  "grading": {
+    "grader": "multi_edit_file",
+    "params": {
+      "files": [
+        "svc_01.conf",
+        "svc_02.conf",
+        "svc_03.conf",
+        "svc_04.conf",
+        "svc_05.conf",
+        "svc_06.conf",
+        "svc_07.conf",
+        "svc_08.conf",
+        "svc_09.conf",
+        "svc_10.conf"
+      ],
+      "expected": {
+        "svc_01.conf": "batch = v4\ntls = 36\nendpoint = http://olds.internal:8080\nretries = auto\nmode = on\nregion = 58\nport = v3\n# endpoint = http://old.internal:8080\nlog_level = auto\nowner = v9\nworkers = v7\nschema = on\npool_size = auto\n",
+        "svc_02.conf": "retries = 18\nschema = on\nowner = 49\nendpoint = http://old.internal:80800\n# endpoint = http://old.internal:8080\nregion = 37\ntls = off\nlog_level = off\nhost = v3\npool_size = on\nport = auto\nmode = auto\nbatch = 12\n",
+        "svc_03.conf": "endpoint = http://old.internal:8081\nretries = v2\nlog_level = auto\nregion = off\nworkers = 43\npool_size = v4\nendpoint = http://old.internal:8080/health\nschema = off\nbatch = 52\nhost = v9\nport = on\nowner = on\n",
+        "svc_04.conf": "host = off\nlog_level = v4\nmode = on\nbatch = 97\nregion = on\nendpoint = http://new.internal:9090\nworkers = auto\n",
+        "svc_05.conf": "endpoint = http://new.internal:9090\nworkers = 78\nhost = on\nretries = on\nlog_level = auto\nschema = auto\nmode = v6\npool_size = v6\nport = 65\ntls = on\n",
+        "svc_06.conf": "pool_size = v3\nlog_level = v4\nowner = 86\nendpoint = http://new.internal:9090\nbackup_endpoint = http://old.internal:8080\ntls = auto\nport = 3\nmode = on\nbatch = on\nhost = on\n",
+        "svc_07.conf": "endpoint = http://old.internal:8080/health\nschema = on\nendpoint = http://olds.internal:8080\nretries = on\nmode = on\nowner = off\nworkers = v9\ntls = 71\nport = 93\nregion = 36\n",
+        "svc_08.conf": "port = 77\nretries = on\nowner = on\nregion = v6\nmode = off\nschema = off\nbackup_endpoint = http://old.internal:8080\nendpoint = http://new.internal:9090\nbatch = off\n",
+        "svc_09.conf": "tls = 99\nmode = on\nretries = v3\nbatch = auto\nowner = v7\nhost = on\nport = off\nendpoint = http://new.internal:9090\nschema = off\n",
+        "svc_10.conf": "region = 47\nowner = auto\npool_size = v5\nport = on\nworkers = v8\nretries = 4\ntls = on\nendpoint = http://old.internal:80800\nschema = 86\nbatch = v6\nlog_level = 20\nmode = off\nendpoint = http://new.internal:9090\n"
+      }
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 바꿔야 할 줄만 정확히 바뀌어야 하고 나머지 줄(디코이 포함)과 줄 수는 그대로여야 한다(바뀌면 unexpected_change). 바꿀 줄을 안 바꾸면 wrong_value, 파일이 없으면 missing_output."
+  },
+  "overlap_with": [],
+  "hand_check": "설정 파일 10개 중 바꿀 줄(정확히 `endpoint = http://old.internal:8080`)이 있는 파일은 6개: {'svc_04.conf': 6, 'svc_05.conf': 1, 'svc_06.conf': 4, 'svc_08.conf': 8, 'svc_09.conf': 8, 'svc_10.conf': 13}(파일: 줄 번호). 나머지 4개는 바꿀 줄이 없고 디코이만 있다. 디코이 6종(#로 시작하는 주석, backup_endpoint, 포트 8081, 값 뒤에 /health, 포트 80800, olds.internal)이 모두 쓰였다. 사람이 확인할 표본: [svc_04.conf 6번째 줄 `endpoint = http://old.internal:8080`]; [svc_05.conf 1번째 줄 `endpoint = http://old.internal:8080`]; [svc_06.conf 4번째 줄 `endpoint = http://old.internal:8080`]; 디코이 예: [svc_01.conf: # endpoint = http://old.internal:8080]; [svc_02.conf: # endpoint = http://old.internal:8080]; [svc_03.conf: endpoint = http://old.internal:8081]; [svc_06.conf: backup_endpoint = http://old.internal:8080]; [svc_07.conf: endpoint = http://old.internal:8080/health]; [svc_08.conf: backup_endpoint = http://old.internal:8080]; [svc_10.conf: endpoint = http://old.internal:80800]. 사람이 확인하는 방법: 각 파일에서 `grep -n \"^endpoint = http://old.internal:8080$\"`.",
+  "answer": {
+    "changed": {
+      "svc_04.conf": 6,
+      "svc_05.conf": 1,
+      "svc_06.conf": 4,
+      "svc_08.conf": 8,
+      "svc_09.conf": 8,
+      "svc_10.conf": 13
+    }
+  },
+  "min_steps": 13,
+  "min_steps_basis": "검색 1(대상 줄 찾기) + 대상 파일 6개마다 읽기 1 + 쓰기 1 = 13. 수정 도구가 읽기 없이 쓰일 수 있다면 7(가설: 확인 불가)"
+}

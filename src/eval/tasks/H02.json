@@ -1,0 +1,32 @@
+{
+  "id": "H02",
+  "slug": "sum-lines-of-big-files",
+  "rev": 1,
+  "difficulty": "hard",
+  "prompt": "작업 폴더에는 문서 파일(.txt) 12개가 있어. 줄 수가 100줄 이상인 파일만 골라 그 줄 수를 모두 더해서 total_lines.out에 `합계: <숫자>` 형식으로 한 줄만 저장해줘. 줄 수는 줄바꿈으로 끝나는 줄의 개수야.",
+  "fixture": "H02",
+  "format_hint": "합계: <숫자>",
+  "outputs": [
+    "total_lines.out"
+  ],
+  "grading": {
+    "grader": "text_file",
+    "params": {
+      "path": "total_lines.out",
+      "expected_text": "합계: 313",
+      "value_tokens": [
+        "313"
+      ]
+    },
+    "allowed": "앞뒤 공백·끝 줄바꿈·연속 공백은 무시. 숫자·파일명·문장부호는 대소문자까지 엄격 일치."
+  },
+  "overlap_with": [
+    "file_stats|Read"
+  ],
+  "hand_check": "문서 파일 12개의 줄 수: {'part_01.txt': 100, 'part_02.txt': 41, 'part_03.txt': 35, 'part_04.txt': 101, 'part_05.txt': 88, 'part_06.txt': 99, 'part_07.txt': 63, 'part_08.txt': 18, 'part_09.txt': 77, 'part_10.txt': 54, 'part_11.txt': 29, 'part_12.txt': 112}. 기준은 100줄 이상: {'part_01.txt': 100, 'part_04.txt': 101, 'part_12.txt': 112} -> 합 313. 경계 파일: 99줄(기준보다 1 작음, 제외), 100줄(기준과 같음, 포함), 101줄(기준보다 1 큼, 포함). 합이 400 이하라 암산이 쉽다. 사람이 확인하는 방법: 각 파일에 `wc -l`.",
+  "answer": {
+    "sum": 313
+  },
+  "min_steps": 13,
+  "min_steps_basis": "통계 12(파일 12개의 줄 수) + 쓰기 1. 검색의 개수 모드로 줄 수를 모으는 우회는 최소로 보지 않음(가설: 가능할 수 있음)"
+}

@@ -70,12 +70,12 @@ def test_summary_counts_and_overlap():
     s = summarize(ALL)
     assert "- easy: 15 / 0 / 15" in s
     assert "- medium: 17 / 0 / 17" in s
-    assert "- hard: 0 / 0 / 8" in s
-    assert "- 합계: 32 / 0 / 40" in s
+    assert "- hard: 8 / 0 / 8" in s
+    assert "- 합계: 40 / 0 / 40" in s
     assert "미작성(todo)" not in s
-    assert "overlap_with가 있는 과제: 16 / 준비된 32개" in s
+    assert "overlap_with가 있는 과제: 20 / 준비된 40개" in s
     assert "- search_text|Grep: 12개 (E01, E02, E08, E13, M01, M02, M03, M04, M05, M06, M07, M08)" in s
-    assert "- file_stats|Read: 4개 (E03, E10, M09, M10)" in s
+    assert "- file_stats|Read: 8개 (E03, E10, H01, H02, H04, H08, M09, M10)" in s
 
 
 def test_medium_overlap_structure():

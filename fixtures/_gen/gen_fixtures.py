@@ -398,9 +398,311 @@ def gen_m17(rng: random.Random, out: Path):
     return None, {}
 
 
+# ====================== Day 6: 어려운 과제 H01~H08 ======================
+
+EXOTIC = re.compile("[\r\u2028\u2029\u0085\x0b\x0c\x1c\x1d\x1e]")  # file_stats(splitlines)가 줄바꿈으로 세는 특수 문자: fixture에 넣지 않는다
+
+
+def write_hard(d: Path, name: str, lines: list[str]) -> str:
+    text = write_file(d, name, lines)
+    assert not EXOTIC.search(text), f"{name}: 특수 줄 구분 문자 금지"
+    return text
+
+
+# ---------- H01: 큰 파일 통계. 단어 수가 가장 많은 3개 파일 ----------
+
+H01_LINE_COUNTS = [182, 215, 347, 156, 298, 261, 389, 204, 327, 176]
+H01_TEMPLATES = [
+    "{ts} INFO worker-{a} job {b} done in {c}ms",
+    "{ts} DEBUG cache hit key={b}",
+    "{ts} WARN slow query took {c}ms on shard-{a}",
+    "{ts} INFO request {b} served status={s}",
+    "{ts} ERROR upstream timeout after {c}ms retrying",
+    "{ts} INFO heartbeat ok",
+]
+
+
+def gen_h01(rng: random.Random, out: Path):
+    names = [f"app_{i:02d}.log" for i in range(1, 11)]
+    for _attempt in range(300):
+        texts, words, lines_n = {}, {}, {}
+        for name, n in zip(names, H01_LINE_COUNTS):
+            weights = [rng.random() + 0.15 for _ in H01_TEMPLATES]
+            lines = []
+            for ts in stamps(rng, n, datetime(2026, 6, 1, 9, 0, 0)):
+                tpl = rng.choices(H01_TEMPLATES, weights=weights)[0]
+                lines.append(tpl.format(ts=ts, a=rng.randint(1, 9), b=rng.randint(100, 999), c=rng.randint(5, 900), s=rng.choice([200, 200, 200, 404, 500])))
+            texts[name] = "\n".join(lines) + "\n"
+            words[name], lines_n[name] = count_words(texts[name]), n
+        by_w = sorted(names, key=lambda x: -words[x])
+        by_l = sorted(names, key=lambda x: -lines_n[x])
+        gaps_ok = all(words[by_w[i]] - words[by_w[i + 1]] >= 25 for i in range(3))   # 1~3등 사이와 3등-4등 사이가 25 이상
+        if len(set(words.values())) == 10 and set(by_w[:3]) != set(by_l[:3]) and gaps_ok:
+            break
+    else:
+        raise AssertionError("H01 조건을 만족하는 조합을 찾지 못함")
+    for name in names:
+        write_hard(out, name, texts[name].split("\n")[:-1])
+    top3 = by_w[:3]
+    assert all(150 <= lines_n[n] <= 400 for n in names)
+    return {"items": [f"{n}: {words[n]}" for n in top3]}, {"words_per_file": words, "lines_per_file": lines_n, "top_by_lines": by_l[:3]}
+
+
+# ---------- H02: 다단계(통계 -> 필터 -> 합). 줄 수가 100줄 이상인 파일들의 줄 수 합 ----------
+
+H02_COUNTS = [18, 41, 63, 77, 99, 100, 101, 112, 29, 54, 88, 35]  # 경계: 99(기준-1), 100(기준), 101(기준+1)
+H02_TEMPLATES = ["Invoice batch {n} was archived on shelf {s}.", "Ledger page {n} was reviewed by clerk {c}.",
+                 "Receipt bundle {n} moved to cabinet {s}.", "Audit note {n} was signed by clerk {c}."]
+
+
+def gen_h02(rng: random.Random, out: Path):
+    counts = H02_COUNTS[:]
+    rng.shuffle(counts)
+    texts = {}
+    for i, c in enumerate(counts, 1):
+        lines = [rng.choice(H02_TEMPLATES).format(n=rng.randint(100, 999), s=rng.randint(1, 40), c=rng.choice("ABCDEFGH")) for _ in range(c)]
+        texts[f"part_{i:02d}.txt"] = write_hard(out, f"part_{i:02d}.txt", lines)
+    lc = {nm: count_lines(t) for nm, t in texts.items()}
+    big = {nm: c for nm, c in lc.items() if c >= 100}
+    assert sorted(big.values()) == [100, 101, 112] and {99, 100, 101} <= set(lc.values())
+    return {"sum": sum(big.values())}, {"lines_per_file": lc}
+
+
+# ---------- H03: 충돌하는 문서. 최신 날짜 문서의 포트 (동률이면 파일 이름 알파벳 순) ----------
+
+H03_DOCS = {  # 파일: (Last updated, 포트, 포트 문장)
+    "changelog.md": ("2025-11-20", 3000, "Services listen on port {p} by default."),
+    "faq.md": ("2026-02-02", 8081, "By default the server uses port {p}."),
+    "ops_guide.md": ("2026-03-14", 8443, "The default port is {p}."),
+    "readme.md": ("2026-01-05", 8080, "The default port is {p}."),
+    "release_notes.md": ("2026-03-01", 9090, "Services listen on port {p} by default."),
+    "runbook.md": ("2026-03-14", 9000, "By default the server uses port {p}."),
+}
+H03_FILLER = ["Check the service logs before restarting.", "Backups run every night at low traffic.",
+              "Contact the on-call engineer for urgent issues.", "Keep configuration files under version control.",
+              "Restart the worker after changing the schedule.", "Metrics are sent every minute.",
+              "Use the staging environment for dry runs.", "Rotate credentials every quarter.",
+              "Document every change in the team notes.", "Review alerts at the start of each shift.",
+              "Disk usage is checked by the nightly job.", "Escalate unknown errors to the platform team."]
+
+
+def gen_h03(rng: random.Random, out: Path):
+    texts = {}
+    for name, (date, port, sentence) in H03_DOCS.items():
+        body = rng.sample(H03_FILLER, rng.randint(8, 12))
+        body.insert(rng.randint(0, len(body)), sentence.format(p=port))
+        title = "# " + name.split(".")[0].replace("_", " ").title()
+        texts[name] = write_hard(out, name, [title, f"Last updated: {date}"] + body)
+    for name, t in texts.items():
+        assert len(re.findall(r"\d{4}-\d{2}-\d{2}", t)) == 1, name                                 # 날짜는 문서마다 하나, 형식은 YYYY-MM-DD
+        assert len(re.findall(r"\d{4,5}", re.sub(r"\d{4}-\d{2}-\d{2}", "", t))) == 1, name       # 포트 문장 하나뿐, 다른 네다섯 자리 숫자 없음
+        assert not re.search(r"(?i)last updated:(?! \d{4}-\d{2}-\d{2}$)", t, re.M), name
+    latest = max(d for d, _, _ in H03_DOCS.values())
+    tied = sorted(n for n, (d, _, _) in H03_DOCS.items() if d == latest)
+    assert tied == ["ops_guide.md", "runbook.md"] and H03_DOCS[tied[0]][1] != H03_DOCS[tied[1]][1]  # 최신 날짜 동률 한 쌍, 포트가 다름
+    return {"port": H03_DOCS[tied[0]][1]}, {"latest": latest, "tied_files": tied}
+
+
+# ---------- H04: 오류가 섞인 입력. 첫 줄 '# lines: N'이 실제 줄 수와 다른 문서 ----------
+
+H04_TOTALS = [34, 52, 71, 45, 120, 88, 63, 39, 97, 56]  # 헤더 줄을 포함한 실제 줄 수
+
+
+def gen_h04(rng: random.Random, out: Path):
+    names = [f"spec_{i:02d}.txt" for i in range(1, 11)]
+    totals = H04_TOTALS[:]
+    rng.shuffle(totals)
+    wrong_idx = rng.sample(range(10), 3)
+    deltas = {wrong_idx[0]: -1, wrong_idx[1]: +1, wrong_idx[2]: +12}   # 오차 1(헤더를 빼고 센 값), 오차 1(하나 더), 크게 틀림
+    texts, claims = {}, {}
+    for i, (name, total) in enumerate(zip(names, totals)):
+        claim = total + deltas.get(i, 0)
+        body = [f"Section {k} covers item {rng.randint(10, 99)} of the plan." for k in range(1, total)]
+        texts[name] = write_hard(out, name, [f"# lines: {claim}"] + body)
+        claims[name] = (claim, total)
+    wrong = sorted(n for n, (c, t) in claims.items() if c != t)
+    assert len(wrong) == 3 and all(count_lines(texts[n]) == claims[n][1] for n in names)
+    assert any(c == t - 1 for c, t in claims.values()) and any(c == t + 1 for c, t in claims.values())  # 오차 1 함정이 실제로 있다
+    assert all(t.count("# lines:") == 1 and t.startswith("# lines: ") and sum(1 for ln in t.split("\n") if ln.startswith("#")) == 1 for t in texts.values())
+    return {"items": wrong}, {"claims": {n: {"claimed": c, "actual": t} for n, (c, t) in claims.items()}}
+
+
+# ---------- H05: 대규모 수정. 값이 정확히 같은 endpoint 줄만 바꾼다 ----------
+
+H05_OLD = "endpoint = http://old.internal:8080"
+H05_NEW = "endpoint = http://new.internal:9090"
+H05_DECOYS = ["# " + H05_OLD, "backup_" + H05_OLD, "endpoint = http://old.internal:8081", H05_OLD + "/health",
+              "endpoint = http://old.internal:80800", "endpoint = http://olds.internal:8080"]
+H05_KEYS = ["host", "port", "workers", "log_level", "mode", "region", "pool_size", "retries", "tls", "schema", "owner", "batch"]
+
+
+def gen_h05(rng: random.Random, out: Path):
+    names = [f"svc_{i:02d}.conf" for i in range(1, 11)]
+    target_files = sorted(rng.sample(names, 6))
+    others = [n for n in names if n not in target_files]
+    decoys_for = {n: [] for n in names}
+    pool = H05_DECOYS * 2
+    rng.shuffle(pool)
+    for n in others:                      # 바꿀 줄이 없는 파일 4개: 디코이 2개씩
+        decoys_for[n] += [pool.pop(), pool.pop()]
+    for n in rng.sample(target_files, 3):  # 대상 파일 중 3개에도 디코이 1개
+        decoys_for[n].append(pool.pop())
+    expected, changed, texts = {}, {}, {}
+    for n in names:
+        lines = []
+        for key in rng.sample(H05_KEYS, rng.randint(6, 11)):
+            lines.append(f"{key} = {rng.choice(['on', 'off', 'auto', str(rng.randint(1, 99)), 'v' + str(rng.randint(1, 9))])}")
+        for d in decoys_for[n]:
+            lines.insert(rng.randint(0, len(lines)), d)
+        if n in target_files:
+            lines.insert(rng.randint(0, len(lines)), H05_OLD)
+        texts[n] = write_hard(out, n, lines)
+        expected[n] = "\n".join(H05_NEW if ln == H05_OLD else ln for ln in lines) + "\n"
+        if n in target_files:
+            changed[n] = lines.index(H05_OLD) + 1
+    flat = [ln for t in texts.values() for ln in t.split("\n")]
+    assert sum(1 for ln in flat if ln == H05_OLD) == 6 == len(changed)
+    assert {d for d in H05_DECOYS} <= set(flat)                         # 디코이 6종이 모두 실제로 쓰였다
+    assert all(sum(1 for ln in t.split("\n") if ln == H05_OLD) == (1 if n in target_files else 0) for n, t in texts.items())
+    assert not any(ln.startswith(" ") or "new.internal" in ln for ln in flat)
+    return {"changed": changed}, {"expected": expected, "decoys_for": decoys_for}
+
+
+# ---------- H06: 교차 참조. 목록에 있는 고객 중 주문이 가장 많은 고객의 이름 ----------
+
+H06_NAMES = ["Aldo", "Bruna", "Cleo", "Dmitri", "Esme", "Farid", "Greta", "Hugo", "Ines", "Jonas", "Kira", "Lazlo", "Mona", "Nils",
+             "Olga", "Pablo", "Quinn", "Rosa", "Silas", "Tara", "Uriel", "Vera", "Wilf", "Xena", "Yusuf", "Zora", "Alma", "Brent",
+             "Cyrus", "Dana", "Elio", "Fern", "Gael", "Hana", "Ivor", "Jade", "Knut", "Lena", "Milo", "Nora"]
+
+
+def gen_h06(rng: random.Random, out: Path):
+    ids = [f"c{i:03d}" for i in range(1, 41)]
+    lowered = [n.lower() for n in H06_NAMES]
+    assert len(set(lowered)) == 40 and not any(a != b and a in b for a in lowered for b in lowered)  # 이름 중복, 부분 문자열 금지
+    tiers = ["gold"] * 9 + ["silver"] * 13 + ["basic"] * 18
+    rng.shuffle(tiers)
+    top, second = rng.sample(ids, 2)
+    order_ids = [top] * 8 + [second] * 6 + ["c099"] * 11            # c099는 customers.csv에 없는 id이고 전체에서 가장 많다(함정)
+    rest = [i for i in ids if i not in (top, second)]
+    extra: list[str] = []
+    while len(extra) < 35:
+        pick = rng.choice(rest)
+        if extra.count(pick) < 5:
+            extra.append(pick)
+    order_ids += extra
+    rng.shuffle(order_ids)
+    write_hard(out, "customers.csv", ["id,name,tier"] + [f"{i},{n},{t}" for i, n, t in zip(ids, H06_NAMES, tiers)])
+    write_hard(out, "orders.csv", ["order_id,customer_id,qty"] + [f"o{n:03d},{cid},{rng.randint(1, 9)}" for n, cid in enumerate(order_ids, 1)])
+    from collections import Counter
+    freq = Counter(order_ids)
+    known = {k: v for k, v in freq.items() if k in ids}
+    ranked = sorted(known.values(), reverse=True)
+    assert len(order_ids) == 60 and ranked[0] == 8 and ranked[1] == 6 and freq["c099"] == 11 > ranked[0]
+    name_of = dict(zip(ids, H06_NAMES))
+    return {"name": name_of[top]}, {"top_id": top, "top_count": 8, "second_id": second, "second_count": 6, "unknown_id": "c099", "unknown_count": 11}
+
+
+# ---------- H07: 다단계. include 체인을 따라간 최종 timeout ----------
+
+H07_FILES = {
+    "main.conf": ["timeout = 10", "include = site.conf", "# include = legacy.conf", "include = base.conf", "mode = fast"],
+    "site.conf": ["timeout = 50", "region = eu"],
+    "base.conf": ["timeout = 20", "include = net.conf", "retries = 3"],
+    "net.conf": ["timeout = 30", "include = tuning.conf", "timeout = 35"],
+    "tuning.conf": ["include = deep.conf", "timeout = 40"],
+    "deep.conf": ["timeout = 45"],
+    "legacy.conf": ["timeout = 77"],     # include가 주석 처리되어 처리되지 않는 파일
+    "orphan.conf": ["timeout = 99"],     # 어디에서도 include되지 않는 파일
+}
+
+
+def gen_h07(rng: random.Random, out: Path):
+    for name, lines in H07_FILES.items():
+        write_hard(out, name, lines)
+    answer = 35  # 처리 순서: main(10) -> site(50) -> base(20) -> net(30) -> tuning -> deep(45) -> tuning(40) -> net(35)  -> 이후 timeout 대입 없음
+    decoys = {10, 50, 20, 30, 40, 45, 77, 99}
+    assert answer not in decoys and len(H07_FILES) == 8
+    return {"timeout": answer}, {"trace": ["main L1: 10", "main L2 include site.conf -> site L1: 50", "main L3 주석, 무시",
+                                           "main L4 include base.conf -> base L1: 20", "base L2 include net.conf -> net L1: 30",
+                                           "net L2 include tuning.conf -> tuning L1 include deep.conf -> deep L1: 45",
+                                           "tuning L2: 40", "net L3: 35", "base L3 retries (timeout 아님)", "main L5 mode (timeout 아님)"]}
+
+
+# ---------- H08: 모호한 지시 + 규칙. 바이트 수가 가장 큰 파일 (글자 수 최대와 다름, 동률은 알파벳 순) ----------
+
+SYLLABLES = "가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허고노도로모보소오조초코토포호구누두루무부수우주추쿠투푸후"
+EN_WORDS = ["meeting", "notes", "project", "budget", "review", "schedule", "update", "report", "client", "design", "plan", "team",
+            "draft", "status", "action", "item", "follow", "agenda", "summary", "risk"]
+H08_SIZES = [("ko", 5016), ("ko", 5016), ("ko", 4992), ("ko", 4380), ("ko", 3900), ("en", 3360), ("ko", 3150), ("ko", 2640), ("en", 2900), ("ko", 1800)]
+
+
+def _ko_line(n: int, rng: random.Random) -> str:
+    """정확히 n바이트(끝 줄바꿈 포함)인 한글 한 줄."""
+    body = n - 1
+    w = rng.randint(3, 6)
+    b = body - (w - 1)                       # 단어 사이 공백 w-1개(각 1바이트)
+    k, j = divmod(b, 3)                      # 한글 k자(3바이트) + 영숫자 j자(1바이트)
+    assert k >= w
+    cuts = sorted(rng.sample(range(1, k), w - 1))
+    sizes = [b2 - a2 for a2, b2 in zip([0] + cuts, cuts + [k])]
+    words = ["".join(rng.choice(SYLLABLES) for _ in range(sz)) for sz in sizes]
+    words[-1] += "".join(str(rng.randint(0, 9)) for _ in range(j))
+    line = " ".join(words)
+    assert len((line + "\n").encode("utf-8")) == n
+    return line
+
+
+def _en_line(n: int, rng: random.Random) -> str:
+    body = n - 1
+    s = ""
+    while len(s) < body + 12:
+        s += rng.choice(EN_WORDS) + " "
+    s = s[:body]
+    if s.endswith(" "):
+        s = s[:-1] + rng.choice("abcdefgh")
+    assert len((s + "\n").encode("utf-8")) == n and "  " not in s and s == s.strip()
+    return s
+
+
+def _exact_bytes_file(kind: str, target: int, rng: random.Random) -> list[str]:
+    line_fn = _ko_line if kind == "ko" else _en_line
+    lines, remaining = [], target
+    while remaining > 140:
+        size = rng.randint(40, 70)
+        lines.append(line_fn(size, rng))
+        remaining -= size
+    first = remaining // 2
+    lines += [line_fn(first, rng), line_fn(remaining - first, rng)]
+    return lines
+
+
+def gen_h08(rng: random.Random, out: Path):
+    kinds = H08_SIZES[:]
+    rng.shuffle(kinds)
+    texts, kind_of = {}, {}
+    for i, (kind, size) in enumerate(kinds, 1):
+        name = f"note_{i:02d}.txt"
+        texts[name] = write_hard(out, name, _exact_bytes_file(kind, size, rng))
+        kind_of[name] = kind
+        assert len(texts[name].encode("utf-8")) == size, (name, size)
+    nbytes = {n: len(t.encode("utf-8")) for n, t in texts.items()}
+    nchars = {n: len(t) for n, t in texts.items()}
+    top = max(nbytes.values())
+    tied = sorted(n for n, b in nbytes.items() if b == top)
+    assert len(tied) == 2 and top == 5016                                              # 바이트 최댓값 동률은 정확히 한 쌍
+    assert sorted(nbytes.values())[-3] < top                                           # 3등은 최댓값보다 작다
+    char_max = max(nchars, key=nchars.get)
+    assert char_max not in tied and kind_of[char_max] == "en"                          # 글자 수 최대 파일은 바이트 최대 파일이 아니다
+    assert sum(1 for c in nchars.values() if c == nchars[char_max]) == 1
+    assert all(count_lines(t) >= 3 and t.endswith("\n") for t in texts.values())
+    return {"file": tied[0], "bytes": top}, {"bytes_per_file": nbytes, "chars_per_file": nchars, "tied_files": tied, "char_max_file": char_max}
+
+
 GENERATORS = {f"M{i:02d}": fn for i, fn in enumerate(
     [gen_m01, gen_m02, gen_m03, gen_m04, gen_m05, gen_m06, gen_m07, gen_m08, gen_m09, gen_m10,
      gen_m11, gen_m12, gen_m13, gen_m14, gen_m15, gen_m16, gen_m17], 1)}
+GENERATORS.update({f"H{i:02d}": fn for i, fn in enumerate(
+    [gen_h01, gen_h02, gen_h03, gen_h04, gen_h05, gen_h06, gen_h07, gen_h08], 1)})
 SEEDS = {tid: 20261100 + i for i, tid in enumerate(GENERATORS, 1)}
 
 
