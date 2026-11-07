@@ -69,6 +69,16 @@ def test_big_fixture_hand_check_has_three_verified_samples(tid):
         assert lines[int(num) - 1] == content, (tid, fname, num)
 
 
+def test_hand_check_decoy_examples_really_are_non_targets():
+    """'아닌 줄 예'로 든 표본이 실제로 대상이 아닌지 확인한다 (M01: dev-017이 없는 줄, M02: FAILED가 없는 줄)."""
+    for tid, marker, token in (("M01", "dev-017이 아닌 줄 예: [", "dev-017"), ("M02", "FAILED가 아닌 줄 예: [", "FAILED")):
+        hc = TASKS[tid].hand_check
+        m = re.search(re.escape(marker) + r"(\d+)번째 줄 `([^`]*)`", hc)  # 로그 줄 안에 ]가 있을 수 있어 백틱 기준으로 읽는다
+        assert m, (tid, hc[:80])
+        num, content = m.groups()
+        assert token not in content, (tid, num, content)
+
+
 def test_m10_hand_check_names_the_boundary_files():
     import json
     words = json.loads((loader.PLANTS_DIR / "M10.json").read_text(encoding="utf-8"))["planted"]["words_per_file"]
