@@ -141,3 +141,5 @@
 - freeze.py 구현 후, MANIFEST 생성 전 실행: 15개 중 11개 통과(검증 장치 자체 테스트), 4개 실패(매니페스트 파일이 없어서 FileNotFoundError, 예상과 같음).
 - 동결 실행(2026-11-09, 사용자 손 대조 완료 후): `python -m src.eval.freeze --write` -> MANIFEST.json(과제 40, fixture 파일 155, 채점 파일 2, 정답 풀이 40, 도구 정의 v1/HARNESS_ENV/config 기본값 해시). 동결 직전 전체 테스트 677개 통과, 로더 --check 문제 0개. 동결 후 freeze 테스트 15개 통과, 재작성 시도는 FileExistsError로 거부. 위치별 버그 0건.
 - 한 일: 평가셋 동결과 변경 감지 테스트. 숫자: 40개 과제 모두 동결. 다음 할 일: Day 7~8 베이스라인 준비(예상 호출 수 출력 후 사용자 확인). 범위 밖(동결 대상 아님): report.py, loader.py, 생성기, plants, verify_counts.py.
+- 수치 대조(동결 후): 전체 테스트 692개 통과(동결 전 677 + freeze 15, 건너뜀 0). 위 'Day 6 기록'의 674 통과 1 건너뜀은 그 시점 값이고, 이후 min_steps 구간 테스트 3개와 freeze 테스트 15개가 늘었다. 과제 40개, 정답 풀이 40/40 통과, 무작업 40/40 실패, fixture 155개 파일은 MANIFEST.json과 일치. 푸시 확인: origin/main = 1ba82b5.
+- H07 구조(손 대조용 정확한 수): 체인에 든 파일 6개(main, site, base, net, tuning, deep), include 중첩 최대 4단계(main > base > net > tuning > deep), timeout 대입 7번(10, 50, 20, 30, 45, 40, 35), hand_check 처리 단계 10개(주석, timeout 아닌 줄 포함).
