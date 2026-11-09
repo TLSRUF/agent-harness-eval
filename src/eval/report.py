@@ -298,7 +298,8 @@ def tool_error_split_line(runs: list[Run]) -> str:
 
 # ---- min_steps 구간별 성공률 ----
 
-MIN_STEPS_BINS = [("1~2", 1, 2), ("3~4", 3, 4), ("5 이상", 5, None)]
+MIN_STEPS_BINS = [("1~2", 1, 2), ("3 이상", 3, None)]                          # 주 지표(2구간)
+MIN_STEPS_BINS_AUX = [("1~2", 1, 2), ("3~7", 3, 7), ("8 이상", 8, None)]       # 보조 출력(3구간)
 
 
 def min_steps_lines(runs: list[Run], min_steps: dict | None) -> list[str]:
@@ -307,10 +308,11 @@ def min_steps_lines(runs: list[Run], min_steps: dict | None) -> list[str]:
         return ["min_steps 정보가 없어 구간별 성공률을 계산하지 않음"]
     valid = {t: v for t, v in min_steps.items() if isinstance(v, int) and not isinstance(v, bool) and v >= 1}
     out = []
-    for label, lo, hi in MIN_STEPS_BINS:
-        sel = [r for r in runs if r.task_id in valid and r.passed is not None
-               and lo <= valid[r.task_id] and (hi is None or valid[r.task_id] <= hi)]
-        out.append(rate_line(f"min_steps {label}: 성공률", sum(r.passed for r in sel), _per_task(sel)) + _warn_if_small(len(sel)))
+    for prefix, bins in (("min_steps ", MIN_STEPS_BINS), ("보조(3구간) min_steps ", MIN_STEPS_BINS_AUX)):
+        for label, lo, hi in bins:
+            sel = [r for r in runs if r.task_id in valid and r.passed is not None
+                   and lo <= valid[r.task_id] and (hi is None or valid[r.task_id] <= hi)]
+            out.append(rate_line(f"{prefix}{label}: 성공률", sum(r.passed for r in sel), _per_task(sel)) + _warn_if_small(len(sel)))
     excluded_runs = [r for r in runs if r.task_id not in valid]
     if excluded_runs:
         out.append(f"min_steps 없는 과제 {len({r.task_id for r in excluded_runs})}개 제외(실행 {len(excluded_runs)}건)")

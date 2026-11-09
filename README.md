@@ -16,6 +16,7 @@
 ## 한계
 
 - `file_stats` 도구는 `str.splitlines()`를 써서 낱개 CR, U+2028 등도 줄바꿈으로 세며, 평가 fixture에는 이런 문자가 없다.
+- 쉬움·보통은 min_steps가 대부분 2 이하이고 어려움은 모두 3 이상이라, 단계 수의 효과와 과제 유형의 효과를 분리할 수 없다.
 
 ## 기여 안내 / Contributions
 

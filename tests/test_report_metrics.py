@@ -193,39 +193,60 @@ def test_tool_error_rate_split_handles_zero_calls_and_unmatched_ids(tmp_path):
     assert "기타 0/0 = n/a" in ln and "짝 없는 오류 결과 1건" in ln
 
 
-# ---------------- min_steps 구간별 성공률 ----------------
+# ---------------- min_steps 구간별 성공률 (주: 2구간, 보조: 3구간) ----------------
 
-def test_success_rate_by_min_steps_bins(tmp_path):
+AUX = "보조(3구간) min_steps "
+
+
+def test_bins_are_two_primary_and_three_auxiliary():
+    from src.eval import report
+    assert report.MIN_STEPS_BINS == [("1~2", 1, 2), ("3 이상", 3, None)]
+    assert report.MIN_STEPS_BINS_AUX == [("1~2", 1, 2), ("3~7", 3, 7), ("8 이상", 8, None)]
+
+
+def test_success_rate_by_min_steps_primary_two_bins_and_auxiliary_three_bins(tmp_path):
     runs = runs_of(tmp_path, {"s1": [True], "s2": [True, False], "s3": [True], "s4": [False], "s5": [True, True], "s9": [False],
                               "x": [True], "g": [None]})
     ms = {"s1": 1, "s2": 2, "s3": 3, "s4": 4, "s5": 5, "s9": 9, "g": 2}
     text = build_report(runs, min_steps=ms)
-    assert "min_steps 1~2: 성공률 67% (N=2, 과제당 1~2회(최소 1회) / 총 3건)" in line(text, "min_steps 1~2")
-    assert "min_steps 3~4: 성공률 50% (N=2, 과제당 1회 / 총 2건)" in line(text, "min_steps 3~4")
-    assert "min_steps 5 이상: 성공률 67% (N=2, 과제당 1~2회(최소 1회) / 총 3건)" in line(text, "min_steps 5 이상")
-    assert "min_steps 없는 과제 1개 제외(실행 1건)" in text                          # x는 목록에 없음. g는 채점이 없어 성공률에서만 빠짐
-    assert all(WARN in line(text, p) for p in ("min_steps 1~2", "min_steps 3~4", "min_steps 5 이상"))
+    assert "min_steps 1~2: 성공률 67% (N=2, 과제당 1~2회(최소 1회) / 총 3건)" in line(text, "min_steps 1~2: 성공률")
+    assert "min_steps 3 이상: 성공률 60% (N=4, 과제당 1~2회(최소 1회) / 총 5건)" in line(text, "min_steps 3 이상: 성공률")
+    assert "성공률 67% (N=2, 과제당 1~2회(최소 1회) / 총 3건)" in line(text, AUX + "1~2")
+    assert "성공률 75% (N=3, 과제당 1~2회(최소 1회) / 총 4건)" in line(text, AUX + "3~7")
+    assert "성공률 0% (N=1, 과제당 1회 / 총 1건)" in line(text, AUX + "8 이상")
+    assert "min_steps 없는 과제 1개 제외(실행 1건)" in text                       # x는 목록에 없음. g는 채점이 없어 성공률에서만 빠짐
+    assert all(WARN in line(text, p) for p in ("min_steps 1~2: 성공률", "min_steps 3 이상: 성공률", AUX + "1~2", AUX + "3~7", AUX + "8 이상"))
+    assert text.index("min_steps 3 이상: 성공률") < text.index(AUX + "1~2")      # 주 지표가 먼저, 보조가 뒤
+
+
+def test_old_three_bins_are_gone(tmp_path):
+    runs = runs_of(tmp_path, {"a": [True], "b": [True]})
+    text = build_report(runs, min_steps={"a": 2, "b": 6})
+    assert "3~4" not in text and "5 이상" not in text
 
 
 def test_min_steps_bin_boundaries_and_empty_bins(tmp_path):
     runs = runs_of(tmp_path, {"a": [True], "b": [True], "c": [False], "d": [True], "e": [True]})
-    text = build_report(runs, min_steps={"a": 2, "b": 3, "c": 4, "d": 5, "e": 11})
-    assert "N=1, 과제당 1회 / 총 1건" in line(text, "min_steps 1~2")        # 2는 1~2 구간
-    assert "min_steps 3~4: 성공률 50% (N=2" in line(text, "min_steps 3~4")  # 3, 4는 3~4 구간
-    assert "min_steps 5 이상: 성공률 100% (N=2" in line(text, "min_steps 5 이상")  # 5, 11은 5 이상
+    text = build_report(runs, min_steps={"a": 2, "b": 3, "c": 7, "d": 8, "e": 11})
+    assert "min_steps 1~2: 성공률 100% (N=1, 과제당 1회 / 총 1건)" in line(text, "min_steps 1~2: 성공률")   # 2는 1~2 구간
+    assert "min_steps 3 이상: 성공률 75% (N=4" in line(text, "min_steps 3 이상: 성공률")                   # 3, 7, 8, 11
+    assert "성공률 50% (N=2" in line(text, AUX + "3~7")                                                     # 3과 7은 3~7 구간
+    assert "성공률 100% (N=2" in line(text, AUX + "8 이상")                                                 # 8과 11은 8 이상
     empty = build_report([], min_steps={})
-    assert "min_steps 1~2: 성공률 n/a (N=0, 과제당 0회 / 총 0건)" in empty
+    for label in ("min_steps 1~2: 성공률", "min_steps 3 이상: 성공률", AUX + "1~2", AUX + "3~7", AUX + "8 이상"):
+        assert "성공률 n/a (N=0, 과제당 0회 / 총 0건)" in line(empty, label), label
 
 
 def test_min_steps_unknown_means_no_binning(tmp_path):
     text = build_report(runs_of(tmp_path, {"a": [True]}))
-    assert "min_steps 정보가 없어 구간별 성공률을 계산하지 않음" in text
+    assert "min_steps 정보가 없어 구간별 성공률을 계산하지 않음" in text and "3 이상" not in text
 
 
 def test_min_steps_invalid_values_are_treated_as_missing(tmp_path):
     runs = runs_of(tmp_path, {"a": [True], "b": [True], "c": [True]})
     text = build_report(runs, min_steps={"a": 0, "b": None, "c": 2})
-    assert "min_steps 없는 과제 2개 제외(실행 2건)" in text and "min_steps 1~2: 성공률 100% (N=1" in line(text, "min_steps 1~2")
+    assert text.count("min_steps 없는 과제 2개 제외(실행 2건)") == 1               # 제외 안내는 한 번만
+    assert "min_steps 1~2: 성공률 100% (N=1" in line(text, "min_steps 1~2: 성공률")
 
 
 # ---------------- 공통 규칙: 표본 크기 문구 자동 출력 ----------------
@@ -234,7 +255,7 @@ def test_every_new_metric_line_carries_a_sample_label(tmp_path):
     runs = runs_of(tmp_path, {"a": [True, False], "b": [True, True]})
     text = build_report(runs, min_steps={"a": 2, "b": 6})
     label = re.compile(r"N=\d+, 과제당 \d+(~\d+회\(최소 \d+회\)|회) / 총 \d+건")
-    for prefix in ("pass^k", "일관성", "min_steps 1~2", "min_steps 3~4", "min_steps 5 이상"):
+    for prefix in ("pass^k", "일관성", "min_steps 1~2: 성공률", "min_steps 3 이상: 성공률", AUX + "1~2", AUX + "3~7", AUX + "8 이상"):
         assert label.search(line(text, prefix)), prefix
 
 
