@@ -42,6 +42,8 @@ Claude Agent SDK로 도구를 쓰는 에이전트를 구성하고, 40개 과제 
 
 \- 평가셋은 베이스라인 실행 전에 동결한다. 이후 과제 수정과 추가는 하지 않는다.
 
+&#x20; - **동결 완료(2026-11-09, 사용자 손 대조 후).** MANIFEST.json에 과제 JSON 40개, fixture 155개 파일, 채점 파일(graders.py, graders_user.py), 정답 풀이 40개의 sha256과 도구 정의 v1, HARNESS_ENV, config 기본값의 해시가 있다. 이 파일들이 바뀌면 tests/test_freeze.py가 실패한다. 동결 파일은 수정하지 않는다. 버그를 발견하면 고치기 전에 사용자에게 알리고, 승인된 변경만 반영한 뒤 사용자가 MANIFEST.json을 지우고 `python -m src.eval.freeze --write`로 다시 동결하고 사유를 progress.md에 기록한다.
+
 \- 과제 프롬프트에는 도구 이름을 쓰지 않는다.
 
 \- 모든 리포트의 성공률과 선택률에는 표본 크기(N, M, 총 실행 수)가 자동으로 함께 출력된다.
