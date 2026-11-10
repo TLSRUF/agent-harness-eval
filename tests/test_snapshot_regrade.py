@@ -286,9 +286,11 @@ def test_regrade_never_calls_the_model():
 
 def test_regrade_on_existing_raw_logs_skips_them_all(capsys):
     """results/raw의 기존 로그(스냅샷 기능 이전)는 스냅샷이 없으므로 모두 건너뛴다. 로컬에 로그가 없으면 건너뛰는 테스트."""
-    logs = sorted(Path(loader.ROOT / "results" / "raw").glob("*.jsonl"))
+    raw = Path(loader.ROOT / "results" / "raw")
+    # 스냅샷 폴더(_final)가 있는 로그는 스냅샷 기능 이후에 만든 로그(배치 러너 실행 등)라 대상이 아니다
+    logs = sorted(p for p in raw.glob("*.jsonl") if not (raw / f"{p.stem}_final").exists())
     if not logs:
-        pytest.skip("results/raw에 로그가 없음")
+        pytest.skip("스냅샷 이전의 로그가 results/raw에 없음")
     res = regrade.regrade_runs(logs, snapshot_root=loader.ROOT / "results" / "raw")
     legacy = [r for r in res if "_final" not in r.path]
     assert all(r.status == "skipped" for r in legacy)
