@@ -143,3 +143,16 @@
 - 한 일: 평가셋 동결과 변경 감지 테스트. 숫자: 40개 과제 모두 동결. 다음 할 일: Day 7~8 베이스라인 준비(예상 호출 수 출력 후 사용자 확인). 범위 밖(동결 대상 아님): report.py, loader.py, 생성기, plants, verify_counts.py.
 - 수치 대조(동결 후): 전체 테스트 692개 통과(동결 전 677 + freeze 15, 건너뜀 0). 위 'Day 6 기록'의 674 통과 1 건너뜀은 그 시점 값이고, 이후 min_steps 구간 테스트 3개와 freeze 테스트 15개가 늘었다. 과제 40개, 정답 풀이 40/40 통과, 무작업 40/40 실패, fixture 155개 파일은 MANIFEST.json과 일치. 푸시 확인: origin/main = 1ba82b5.
 - H07 구조(손 대조용 정확한 수): 체인에 든 파일 6개(main, site, base, net, tuning, deep), include 중첩 최대 4단계(main > base > net > tuning > deep), timeout 대입 7번(10, 50, 20, 30, 45, 40, 35), hand_check 처리 단계 10개(주석, timeout 아닌 줄 포함).
+
+## Day 7 — 배치 러너 단위 테스트 첫 실행 기록 (구현 전)
+- tests/test_batch.py(가짜 query, API 호출 없음)를 구현보다 먼저 작성. 범위: 이어하기(건너뜀/끊긴 실행 재실행/보관 이름 .partialN, 스냅샷 폴더 포함), error_max_turns+예외도 완료, 동결 불일치/서버 불일치 거부, y/n/--yes, 코드 변경 시에만 경고, 재현성 필드, 스냅샷에 출력 파일, 한도 임계(설정/미설정/파일/CLI 덮어쓰기/비허용 status), 탐침 시작/끝과 별도 이름, 배치 델타와 측정 한계 표시, 요약 표, Ctrl+C, ToolGuardError, API/한도 오류 정지, 비용 상한 측정값.
+- 첫 실행: src.eval.batch 모듈이 없어 수집 단계에서 ImportError (예상과 같음, 구현 전 상태).
+- 구현 후 실행: tests/test_batch.py 39개 첫 실행에서 전부 통과(고칠 실패 없음). 전체 731개 통과, freeze --verify "동결 일치". 음성 대조(batch.py를 임시 변조 후 복구 확인, 9가지): 예외 있으면 무조건 중단 처리, 임계 >= 를 >로, 끊긴 파일 보관 안 함, docs도 경고, outputs 미전달, 비허용 status 무시, 동결 불일치 무시, 임계 기본값 0.8, 탐침에 도구 허용은 모두 테스트 1~4개가 실패.
+- 실제 환경 스모크(모델 호출 없음): 진짜 freeze 검증과 preflight_check(서버 ['t'])를 통과하고 예상 호출 수와 비용 상한(어려움 측정 전)을 출력한 뒤 확인에서 n 또는 EOF면 아무것도 실행하지 않음.
+- 위치별 버그: 러너 0(실행으로 발견한 것 없음; 확인 입력 EOF 처리는 스모크 전에 보완), 테스트 코드 2(실행 전에 읽다가 발견해 고침: 인터럽트 뒤 재실행 때 이전 가짜 query 호출이 섞이는 문제, 델타 표시 단정이 seven_day 줄까지 포함하는 문제), 기타 1(임시 패치 스크립트의 assert가 정의 줄까지 세어 1회 실패, repo 아님).
+- 확인 불가로 남긴 것: RateLimitEvent status 목록은 SDK 타입 정의가 근거(웹 문서에서 확인 못 함), 모델 호출 없이 five_hour를 읽는 방법, utilization 단위, 한도/API 오류 문구 판정(가설), `/usage` 숫자와 unifiedWindows 값의 일치 여부.
+
+## Day 7 기록
+- 한 일: 배치 러너(python -m src.eval.batch: 과제 선택, 이어하기, 시작 전 점검, 재현성 필드, 한도 감시, 탐침, 배치 델타, 요약, Ctrl+C/오류 정지) 구현과 가짜 query 테스트 39개. run_task에 snapshot_root, config_extra, Ctrl+C 시 로그 닫기 추가. sdk_notes에 RateLimitEvent status 정리.
+- 숫자: 전체 테스트 731개 통과(692 + 39), 동결 일치. 임계값 미설정, 시험 실행(H01,H02,H04,H05,H07) 전 단계.
+- 다음 할 일: 사용자가 터미널에서 day7check 시험 실행 5개, 결과로 한도 임계와 난이도별 비용 상한 확정, failure_type의 report.py 집계(Day 8 시작 전), 베이스라인 시작.
