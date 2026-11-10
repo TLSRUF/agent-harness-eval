@@ -4,3 +4,12 @@ __pycache__/
 .venv/
 .pytest_cache/
 results/raw/
+# 시험/탐침 실행 결과 요약(베이스라인 이후의 요약 md, csv는 커밋 대상)
+results/day7check_*
+results/day7smoke_*
+results/probe_*
+
+# 시험/탐침 실행 결과 요약(베이스라인 이후의 요약 md, csv는 커밋 대상)
+results/day7check_*
+results/day7smoke_*
+results/probe_*
