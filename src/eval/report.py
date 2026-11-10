@@ -49,6 +49,7 @@ class Run:
     cost: float | None = None
     exception: str | None = None
     passed: bool | None = None  # 채점 결과, 없으면 None
+    failure_type: str | None = None  # grade 이벤트(summary.graded)의 failure_type 그대로. 다시 계산하지 않는다
     cwd: str | None = None  # init 메시지의 작업 폴더 (인자 정규화용)
     seq: list = field(default_factory=list)  # 도구 호출 순서: (SDK 이름, 입력 dict)
     calls_by_kind: Counter = field(default_factory=Counter)  # custom / builtin / other
@@ -113,6 +114,8 @@ def load_run(path: str | Path) -> Run:
         g = summ.get("graded")
         if isinstance(g, dict) and isinstance(g.get("passed"), bool):
             run.passed = g["passed"]
+        if isinstance(g, dict) and isinstance(g.get("failure_type"), str):
+            run.failure_type = g["failure_type"]
     return run
 
 
@@ -319,6 +322,32 @@ def min_steps_lines(runs: list[Run], min_steps: dict | None) -> list[str]:
     return out
 
 
+# ---- failure_type (채점기가 grade 이벤트에 기록한 값 그대로) ----
+
+FAILURE_TYPE_ORDER = ["pass", "wrong_value", "format_error", "missing_output", "unexpected_change"]
+
+
+def failure_type_lines(runs: list[Run]) -> list[str]:
+    """채점기가 준 failure_type을 그대로 센다(passed 등으로 다시 계산하지 않는다). 분모는 값이 기록된 실행.
+
+    알려진 5개 값은 0건이어도 보이고, 모르는 값은 알려진 값 뒤에 이름 순으로 보인다.
+    값이 없는 실행(채점은 있으나 failure_type 기록 없음)과 채점 없는 실행은 따로 알린다.
+    """
+    have = [r for r in runs if r.failure_type is not None]
+    counts = Counter(r.failure_type for r in have)
+    names = FAILURE_TYPE_ORDER + sorted(k for k in counts if k not in FAILURE_TYPE_ORDER)
+    per_task = _per_task(have)
+    warn = _warn_if_small(len(have)) if have else ""  # 값이 기록된 실행이 없으면 n/a만 보이고 경고는 붙이지 않는다
+    out = [rate_line(f"failure_type {k}", counts.get(k, 0), per_task) + warn for k in names]
+    no_value = [r for r in runs if r.failure_type is None and r.passed is not None]
+    ungraded = [r for r in runs if r.failure_type is None and r.passed is None]
+    if no_value:
+        out.append(f"failure_type 기록 없음 {len(no_value)}건(채점은 있으나 값이 없음, 다시 계산하지 않음)")
+    if ungraded:
+        out.append(f"채점 없음 {len(ungraded)}건은 failure_type에서 제외")
+    return out
+
+
 def tool_table(runs: list[Run]) -> list[str]:
     """실행별 도구 이름별 호출 횟수. 커스텀/내장/기타를 구분해서 기록."""
     lines = ["| 실행 | 과제 | 커스텀 | 내장 | 기타 |", "|---|---|---|---|---|"]
@@ -359,6 +388,10 @@ def build_report(runs: list[Run], overlap: dict[str, list[str]] | None = None, m
     # min_steps 구간별 성공률
     out.append("\n## min_steps 구간별 성공률 (분석 전용 필드, 사람이 정한 추정값)")
     out.extend(min_steps_lines(runs, min_steps))
+
+    # 실패 유형 (채점기가 기록한 failure_type 그대로)
+    out.append("\n## 실패 유형 (failure_type, 채점기가 기록한 값 그대로)")
+    out.extend(failure_type_lines(runs))
 
     # 성패 5범주
     cats = Counter(r.category for r in runs)

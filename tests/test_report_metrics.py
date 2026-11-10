@@ -14,7 +14,7 @@ from src.eval.report import build_report, load_run, normalize_args
 WARN = "표본이 작아 해석에 주의"
 
 
-def write_run(path: Path, task, calls=(), *, passed=True, cwd=r"C:\w\task_a", graded=True):
+def write_run(path: Path, task, calls=(), *, passed=True, cwd=r"C:\w\task_a", graded=True, failure_type=None):
     """calls: (도구 이름, 입력 dict, 오류 여부) 목록. ToolUseBlock id와 ToolResultBlock의 tool_use_id를 짝지어 기록한다."""
     rows = [{"kind": "config", "task_id": task, "config": {"model": "claude-haiku-5-5", "prompt_version": "v1", "max_turns": 20,
                                                            "tool_desc_version": "default"}},
@@ -25,7 +25,8 @@ def write_run(path: Path, task, calls=(), *, passed=True, cwd=r"C:\w\task_a", gr
         rows.append({"kind": "message", "message": {"_type": "UserMessage", "content": [
             {"_type": "ToolResultBlock", "tool_use_id": f"tu{i}", "content": "x", "is_error": True if is_err else None}]}})
     rows.append({"kind": "summary", "subtype": "success", "is_error": False, "num_turns": 3, "total_cost_usd": 0.01,
-                 "exception": None, "graded": ({"passed": passed} if graded else None)})
+                 "exception": None,
+                 "graded": ({"passed": passed, **({"failure_type": failure_type} if failure_type is not None else {})} if graded else None)})
     path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
     return load_run(path)
 
@@ -247,6 +248,59 @@ def test_min_steps_invalid_values_are_treated_as_missing(tmp_path):
     text = build_report(runs, min_steps={"a": 0, "b": None, "c": 2})
     assert text.count("min_steps 없는 과제 2개 제외(실행 2건)") == 1               # 제외 안내는 한 번만
     assert "min_steps 1~2: 성공률 100% (N=1" in line(text, "min_steps 1~2: 성공률")
+
+
+# ---------------- failure_type (grade 이벤트 값 그대로 집계) ----------------
+
+def ft_runs(tmp_path, items):
+    """items: [(과제, failure_type 또는 None, passed, graded)]"""
+    return [write_run(tmp_path / f"f{i}.jsonl", t, passed=p, graded=g, failure_type=ft) for i, (t, ft, p, g) in enumerate(items)]
+
+
+def test_failure_type_counts_use_the_grader_value_as_is_with_sample_label(tmp_path):
+    runs = ft_runs(tmp_path, [("a", "pass", True, True), ("b", "pass", True, True), ("c", "wrong_value", False, True),
+                              ("d", "missing_output", False, True), ("e", "wrong_value", False, True)])
+    text = build_report(runs)
+    assert "failure_type pass 40% (N=5, 과제당 1회 / 총 5건)" in line(text, "failure_type pass")
+    assert "failure_type wrong_value 40% (N=5, 과제당 1회 / 총 5건)" in line(text, "failure_type wrong_value")
+    assert "failure_type missing_output 20% (N=5" in line(text, "failure_type missing_output")
+    assert "failure_type format_error 0% (N=5" in line(text, "failure_type format_error")        # 5개 알려진 값은 0건이어도 보인다
+    assert "failure_type unexpected_change 0% (N=5" in line(text, "failure_type unexpected_change")
+    assert all(WARN in line(text, f"failure_type {k}") for k in ("pass", "wrong_value", "format_error"))   # 소표본 경고
+
+
+def test_failure_type_is_not_recomputed_from_passed(tmp_path):
+    """채점기가 준 값과 passed가 서로 어긋나도(가상의 입력) 값을 그대로 센다. report는 판정하지 않는다."""
+    runs = ft_runs(tmp_path, [("a", "pass", False, True), ("b", "wrong_value", True, True)])
+    text = build_report(runs)
+    assert "failure_type pass 50% (N=2" in line(text, "failure_type pass")
+    assert "failure_type wrong_value 50% (N=2" in line(text, "failure_type wrong_value")
+
+
+def test_failure_type_unknown_values_are_shown_and_missing_or_ungraded_runs_are_reported(tmp_path):
+    runs = ft_runs(tmp_path, [("a", "weird_new_type", False, True), ("b", None, True, True), ("c", None, True, False), ("d", "pass", True, True)])
+    text = build_report(runs)
+    assert "failure_type weird_new_type 50% (N=2, 과제당 1회 / 총 2건)" in line(text, "failure_type weird_new_type")   # 분모는 값이 기록된 실행(a, d)
+    assert "failure_type 기록 없음 1건(채점은 있으나 값이 없음, 다시 계산하지 않음)" in text                         # b
+    assert "채점 없음 1건은 failure_type에서 제외" in text                                                       # c
+
+
+def test_failure_type_with_no_runs_and_order(tmp_path):
+    empty = build_report([])
+    assert "failure_type pass n/a (N=0, 과제당 0회 / 총 0건)" in empty
+    assert WARN not in line(empty, "failure_type pass")                                          # 값이 기록된 실행이 없으면 경고 없이 n/a만
+    runs = ft_runs(tmp_path, [("a", "zzz_type", False, True), ("b", "pass", True, True)])
+    lines = [ln for ln in build_report(runs).splitlines() if ln.startswith("failure_type ") and "%" in ln]
+    names = [ln.split()[1] for ln in lines]
+    assert names == ["pass", "wrong_value", "format_error", "missing_output", "unexpected_change", "zzz_type"]   # 알려진 순서 뒤에 모르는 값
+
+
+def test_failure_type_on_real_day7_logs_if_present():
+    files = sorted((Path(__file__).resolve().parents[1] / "results" / "raw").glob("day7check_haiku_default_H*_run1.jsonl"))
+    if len(files) < 5:
+        pytest.skip("day7check 로그가 로컬에 없음")
+    text = build_report([load_run(f) for f in files])
+    assert "failure_type pass 100% (N=5, 과제당 1회 / 총 5건)" in line(text, "failure_type pass")
 
 
 # ---------------- 공통 규칙: 표본 크기 문구 자동 출력 ----------------
