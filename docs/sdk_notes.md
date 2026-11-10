@@ -186,3 +186,11 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 ## 아직 미확인
 1. 매 실행 새로 생성되는 약 40k 캐시 블록의 정체와 재사용 불가 원인 (커넥터 도구 노출이 후보)
 2. utilization 노이즈의 원인, 그리고 utilization이 실제로 무엇의 비율인지 (토큰? 요청? 가중치?)
+
+## RateLimitEvent status 값과 한도 신호 (Day 7, 2026-11-10)
+- 출처: 설치된 SDK 0.2.176 소스(`claude_agent_sdk/types.py`)의 `RateLimitStatus = Literal["allowed", "allowed_warning", "rejected"]`와 docstring(allowed=한도 내, allowed_warning=한도에 가까움, rejected=한도 도달). 공식 문서 웹페이지에서 값 목록을 따로 확인하지는 못했다(문서 확인 불가). 근거는 타입 정의뿐이며 이 목록이 전부라는 보장은 없다. `rate_limit_type`은 five_hour, seven_day, seven_day_opus, seven_day_sonnet, overage. docstring은 utilization을 "0.0~1.0 비율"이라고 하지만, 이 계정에서는 최상위 utilization이 항상 None이었고 값은 `raw.unifiedWindows`에 있었으며 단위는 **미확인**이다. 지금까지 관찰된 status는 "allowed"뿐이다.
+- 값별 처리(배치 러너 `src/eval/batch.py`의 현재 가설): `allowed` 계속. `allowed_warning`, `rejected`, 그 밖의 모든 문자열 값은 그 실행을 마친 뒤 다음 실행 전에 멈추고 이어하기 방법을 출력한다. status가 없는(None) 이벤트는 판단하지 않는다. five_hour 임계값은 별개로, 설정했을 때만 적용한다(기본 없음).
+- 제안(미구현): `allowed_warning`은 임계값 정책과 분리해, 사용자가 "경고에서도 계속" 옵션으로 정하게 할 수 있다. `rejected`는 실행이 결과 없이 끝나면 "중단된 실행"이 되어 재시작 때 다시 실행된다. `resets_at`(유닉스 시각, 의미는 가설)은 멈출 때 출력만 한다.
+- 모델 호출 없이 five_hour를 읽는 방법: **찾지 못했다(확인 불가).** `ClaudeSDKClient`의 `get_server_info`, `get_context_usage`, `get_mcp_status`에는 한도 필드가 없다. `get_server_info`에는 `claude_code_version`과 계정 정보(이메일 포함)가 있어 로그에 저장하지 않는다. CLI 슬래시 명령 `/usage`("Show session cost, plan usage, and what's contributing to your limits")가 있으나 사람이 화면으로 보는 용도이고, 그 숫자가 `unifiedWindows.utilization`과 같은 값인지는 확인되지 않았다. 그래서 배치 시작/끝 값은 1턴 탐침 호출(기본 켜짐)이나 수동 인자(`--start-five-hour`, `--start-seven-day`)로 얻는다.
+- CLI 버전: SDK는 번들 CLI를 쓴다. `get_server_info()["claude_code_version"]`과 init 메시지가 둘 다 2.1.316이고, PATH의 `claude`는 2.1.322로 다르다. 재현성 필드 `repro.cli_version`에는 번들 CLI의 `--version`을 기록한다.
+- 탐침 호출(`probe_*` 파일): Haiku 5.5, 도구 없음(`tools=[]`, `allowed_tools=[]`), max_turns 1, HARNESS_ENV 적용, 설정 파일 불러오기 없음. 베이스라인 결과와 이어하기 감지에 섞이지 않는 별도 이름이다.

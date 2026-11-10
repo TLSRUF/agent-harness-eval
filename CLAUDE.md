@@ -52,9 +52,9 @@ Claude Agent SDK로 도구를 쓰는 에이전트를 구성하고, 40개 과제 
 
 \- 베이스라인 성공률이 90% 이상이면 천장 효과가 생기므로 사용자에게 알리고, 난이도별 결과 중심으로 해석할지 확인한다.
 
-\- 결과 파일명: results/{실험}\_{모델}\_{설정}\_{반복번호}.jsonl
+\- 결과 파일명: results/raw/{실험}\_{모델}\_{설정}\_{과제ID}\_run{n}.jsonl (과제와 반복마다 파일 하나, results/raw/는 gitignore 대상). 요약은 results/{실험}\_{모델}\_{설정}\_summary\_inv{n}.md. 실험과 설정 이름에는 밑줄을 쓰지 않는다. 끊기거나 중단된 실행은 .partial{n}을 붙여 보관하고, 한도 탐침은 probe\_로 시작하는 별도 이름이다.
 
-&#x20; 예: baseline\_haiku\_default\_run1.jsonl, expA\_haiku\_toolDescLong\_run1.jsonl, expD\_sonnet\_default\_partial\_run1.jsonl
+&#x20; 예: baseline\_haiku\_default\_H01\_run1.jsonl, expA\_haiku\_toolDescLong\_E03\_run2.jsonl, day7check\_haiku\_default\_H02\_run1.jsonl (표기상 설정 이름은 밑줄 없이 toolDescLong처럼 붙여 쓴다. 실험 D의 부분 실행은 실험 이름에 partial을 넣어 expDpartial로 쓴다.)
 
 
 
@@ -62,7 +62,7 @@ Claude Agent SDK로 도구를 쓰는 에이전트를 구성하고, 40개 과제 
 
 src/agent/ (runner\_agent.py, tools.py, config.py)
 
-src/eval/ (tasks/, graders.py, runner.py, report.py)
+src/eval/ (tasks/, graders.py, batch.py, report.py, freeze.py)
 
 fixtures/, results/, docs/ (sdk\_notes.md, plan.md, progress.md, failure\_analysis.md), tests/
 

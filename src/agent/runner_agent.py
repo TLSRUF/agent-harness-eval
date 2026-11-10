@@ -98,13 +98,21 @@ async def run_task(
     fixtures_dir: Path | None = None,
     grader: Callable[[Path], Any] | None = None,
     outputs: list[str] | None = None,
+    snapshot_root: Path | None = None,
+    config_extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """과제 1개를 실행하고 요약 dict를 반환한다. 모든 이벤트는 log_path(jsonl)에 기록된다.
 
     grader가 있으면 임시 폴더가 지워지기 전에 grader(workdir)를 호출해 결과를 기록한다.
     임시 폴더가 지워지기 전에 outputs(과제의 출력 파일)와 내용이 바뀐 입력 파일을 results/raw/<로그 줄기>_final/에 저장하고
     snapshot 이벤트를 남긴다(재채점용, src/eval/regrade.py). fixtures_dir와 outputs가 모두 없으면 저장할 대상이 없어 건너뛴다.
+    snapshot_root가 있으면 스냅샷을 RAW_DIR 대신 그 폴더에 저장한다(배치 러너의 출력 폴더).
+    config_extra(재현성 정보: git 커밋, 버전 등)는 config 이벤트의 repro 필드로 기록한다. config에 이미 있는 이름과 같으면 ValueError.
     """
+    if config_extra:
+        dup = sorted(set(config_extra) & set(cfg.to_dict()))
+        if dup:
+            raise ValueError(f"config_extra에 config와 이름이 같은 항목이 있다: {dup}")
     log = TrajectoryWriter(log_path)
     summary: dict[str, Any] = {
         "task_id": task_id, "subtype": None, "is_error": None, "terminal_reason": None, "num_turns": None,
@@ -120,7 +128,8 @@ async def run_task(
         # 첫 줄: 설정과 '허용 도구 목록'의 해시/개수 (관찰된 목록은 init 도착 후 tool_guard 이벤트에 기록)
         allowed = allowed_tool_names(cfg)
         log.write("config", task_id=task_id, config=cfg.to_dict(), prompt=prompt,
-                  allowed_tools_sha256=tools_digest(allowed)["sha256"], allowed_tools_count=len(allowed))
+                  allowed_tools_sha256=tools_digest(allowed)["sha256"], allowed_tools_count=len(allowed),
+                  **({"repro": config_extra} if config_extra else {}))
         guard_error: ToolGuardError | None = None
         try:
             async with contextlib.aclosing(query(prompt=prompt, options=build_options(cfg, workdir))) as stream:
@@ -159,6 +168,9 @@ async def run_task(
         except Exception as e:  # 예기치 못한 실패도 기록하고 호출자에게 결과를 돌려준다
             summary["exception"] = f"{type(e).__name__}: {e}"
             log.write("exception", type=type(e).__name__, error=str(e))
+        except BaseException:  # Ctrl+C(KeyboardInterrupt, CancelledError): 줄마다 flush한 기록은 온전하고, 파일 핸들만 닫고 다시 던진다
+            log.close()
+            raise
         if grader is not None and guard_error is None:
             try:
                 summary["graded"] = to_jsonable(grader(workdir))
@@ -167,7 +179,7 @@ async def run_task(
             log.write("grade", graded=summary["graded"])
         if guard_error is None and (outputs or fixtures_dir is not None):
             try:
-                snap = take_snapshot(workdir, fixtures_dir, outputs, RAW_DIR / f"{Path(log_path).stem}_final")
+                snap = take_snapshot(workdir, fixtures_dir, outputs, (snapshot_root or RAW_DIR) / f"{Path(log_path).stem}_final")
             except Exception as e:  # 스냅샷 실패가 실행 결과를 망치지 않게 기록만 한다
                 snap = {"error": f"{type(e).__name__}: {e}"}
             log.write("snapshot", **snap)
