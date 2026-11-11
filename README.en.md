@@ -18,6 +18,7 @@ This harness blocks external connectors linked to the account from being loaded 
 ## Limitations
 - The `file_stats` tool counts lines with `str.splitlines()`, so lone CR, U+2028 and similar characters are also treated as line breaks; the evaluation fixtures contain no such characters.
 - Easy and medium tasks mostly have min_steps of 2 or less while all hard tasks have 3 or more, so the effect of step count cannot be separated from the effect of task type.
+- num_turns and max_turns appear to be counted in tool calls, not model responses (hypothesis: in the day7check runs (5) and the Day 3 experiment, num_turns = tool calls + 1), so max_turns=20 means up to about 19 tool calls. Parallel calls within one response are counted per call.
 
 ## Contributions
 This project is under active development and is not accepting external contributions (pull requests or issues) for now. We will update this notice once things settle.

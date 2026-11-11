@@ -54,6 +54,8 @@ Claude Agent SDK로 도구를 쓰는 에이전트를 구성하고, 40개 과제 
 
 \- 베이스라인에서 실패가 나오면 배치를 끝까지 돌린 뒤 원인을 (a) 에이전트 실수 (b) 프롬프트 모호 (c) 채점 기준 문제로 분류한다. (b)나 (c)면 해당 과제 베이스라인은 무효이고, 고친 뒤 재동결하고 그 과제 3회를 다시 돌린다.
 
+\- (d) max_turns 한계로 끝난 실행(error_max_turns)은 설정 한계로 인한 결과이므로 베이스라인 결과로 그대로 인정한다. 무효 처리하거나 max_turns를 바꿔서 다시 돌리지 않는다. error_max_turns인데 채점이 통과한 실행은 별도로 센다.
+
 \- 결과 파일명: results/raw/{실험}\_{모델}\_{설정}\_{과제ID}\_run{n}.jsonl (과제와 반복마다 파일 하나, results/raw/는 gitignore 대상). 요약은 results/{실험}\_{모델}\_{설정}\_summary\_inv{n}.md. 실험과 설정 이름에는 밑줄을 쓰지 않는다. 끊기거나 중단된 실행은 .partial{n}을 붙여 보관하고, 한도 탐침은 probe\_로 시작하는 별도 이름이다.
 
 &#x20; 예: baseline\_haiku\_default\_H01\_run1.jsonl, expA\_haiku\_toolDescLong\_E03\_run2.jsonl, day7check\_haiku\_default\_H02\_run1.jsonl (표기상 설정 이름은 밑줄 없이 toolDescLong처럼 붙여 쓴다. 실험 D의 부분 실행은 실험 이름에 partial을 넣어 expDpartial로 쓴다.)
