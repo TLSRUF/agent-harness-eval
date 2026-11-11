@@ -533,3 +533,38 @@ def test_measured_cost_bounds_use_only_batch_logs(env):
     log("day4check_haiku_E01_run1.jsonl", "E01", 7.77)                                    # 옛 규칙 파일은 제외
     b = batch.measured_cost_bounds(env.out)
     assert b == {"H": {"max": 0.09, "n": 2}, "E": {"max": 0.01, "n": 1}}
+
+
+# ---------------- runs.csv: 호출마다 전체 로그에서 다시 만든다(멱등) ----------------
+
+def read_csv_rows(env):
+    import csv
+    p = env.res / "day7check_haiku_default_runs.csv"
+    with p.open(encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def test_runs_csv_accumulates_across_invocations_and_is_idempotent(env):
+    assert env.run("--tasks", "E01", "--runs", "1", "--yes", "--no-probe") == batch.EXIT_OK
+    assert [(r["task"], r["run"]) for r in read_csv_rows(env)] == [("E01", "1")]
+    assert env.run("--tasks", "H01", "--runs", "1", "--yes", "--no-probe") == batch.EXIT_OK
+    # 두 번째 호출은 H01만 선택했지만 CSV에는 앞 호출의 E01 행도 남아 있어야 한다
+    assert [(r["task"], r["run"]) for r in read_csv_rows(env)] == [("E01", "1"), ("H01", "1")]
+    assert env.run("--tasks", "E01", "--runs", "2", "--yes", "--no-probe") == batch.EXIT_OK
+    assert [(r["task"], r["run"]) for r in read_csv_rows(env)] == [("E01", "1"), ("E01", "2"), ("H01", "1")]
+    csv_path = env.res / "day7check_haiku_default_runs.csv"
+    before = csv_path.read_bytes()
+    assert env.run("--tasks", "E01", "--runs", "2", "--yes", "--no-probe") == batch.EXIT_OK   # 할 일 없음
+    assert csv_path.read_bytes() == before                                                    # 멱등: 같은 입력이면 같은 파일
+
+
+def test_runs_csv_rebuilds_from_logs_and_ignores_other_experiments_and_partials(env):
+    import shutil
+    assert env.run("--tasks", "E01", "--runs", "1", "--yes", "--no-probe") == batch.EXIT_OK
+    src = run_log(env, "E01", 1)
+    shutil.copy(src, env.out / "other_haiku_default_E02_run1.jsonl")             # 다른 실험 이름
+    shutil.copy(src, env.out / "day7check_haiku_default_E03_run1.jsonl.partial1")   # 보관된 끊긴 실행
+    shutil.copy(src, env.out / "day7check_haiku_other_E04_run1.jsonl")           # 다른 설정 이름
+    (env.res / "day7check_haiku_default_runs.csv").write_text("stale\n", encoding="utf-8")   # 낡은 파일은 덮어쓴다
+    assert env.run("--tasks", "E01", "--runs", "1", "--yes", "--no-probe") == batch.EXIT_OK
+    assert [(r["task"], r["run"]) for r in read_csv_rows(env)] == [("E01", "1")]
