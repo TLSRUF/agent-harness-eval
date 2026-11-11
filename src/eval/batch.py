@@ -38,7 +38,14 @@ ROOT = Path(__file__).resolve().parents[2]
 EXIT_OK, EXIT_DECLINED, EXIT_REFUSED, EXIT_STOPPED, EXIT_INTERRUPTED = 0, 1, 2, 3, 130
 
 DEFAULT_FIVE_HOUR_STOP = None  # 임계값 기본값은 비워 둔다. 시험 실행 결과를 보고 사용자가 정한다.
-CONFIGS: dict[str, Callable[[], HarnessConfig]] = {"default": lambda: HarnessConfig()}  # 변형 설정은 실험 A~D에서 추가한다
+# 설정 이름(파일명용, 밑줄 금지) -> HarnessConfig. 실험 A는 도구 설명만 바꾼다(tool_desc_version). default는 동결된 config 기본값 그대로.
+CONFIGS: dict[str, Callable[[], HarnessConfig]] = {
+    "default": lambda: HarnessConfig(),
+    "short": lambda: HarnessConfig(tool_desc_version="short"),
+    "long": lambda: HarnessConfig(tool_desc_version="long"),
+    "longDirective": lambda: HarnessConfig(tool_desc_version="long_directive"),
+}
+CONFIG_ALIASES = {"long_directive": "longDirective"}  # 밑줄 이름은 파일명용 이름으로 바꿔 받는다
 RUN_FILE_RE = re.compile(r"^(?P<exp>[A-Za-z0-9]+)_(?P<model>[a-z]+)_(?P<cfg>[A-Za-z0-9]+)_(?P<task>[EMH]\d{2})_run(?P<n>\d+)\.jsonl$")
 NAME_RE = re.compile(r"^[A-Za-z0-9]+$")
 LIMIT_RE = re.compile(r"rate.?limit|usage limit|limit (reached|exceeded)|hit your .{0,20}limit|quota|overloaded|\b429\b|\b529\b|credit balance", re.I)
@@ -106,7 +113,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     sel.add_argument("--difficulty", choices=["easy", "medium", "hard"])
     sel.add_argument("--all", action="store_true", help="40개 전체")
     ap.add_argument("--runs", type=int, default=2, help="과제당 반복 횟수(기본 2)")
-    ap.add_argument("--config", default="default", help="설정 이름(지금은 default만)")
+    ap.add_argument("--config", "--config-name", dest="config", default="default", type=lambda s: CONFIG_ALIASES.get(s, s),
+                    help="설정 이름: default, short, long, longDirective(long_directive도 받음). 실험 A는 도구 설명 변형")
     ap.add_argument("--out-dir", default=str(runner_agent.RAW_DIR), help="jsonl과 스냅샷을 둘 폴더(기본 results/raw)")
     ap.add_argument("--results-dir", default=str(runner_agent.RESULTS_DIR), help="요약 파일을 둘 폴더(기본 results)")
     ap.add_argument("--probe", action=argparse.BooleanOptionalAction, default=True, help="시작/끝에 1턴 탐침 호출로 five_hour, seven_day 읽기(기본 켜짐)")

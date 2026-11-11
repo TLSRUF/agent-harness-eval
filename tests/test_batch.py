@@ -568,3 +568,60 @@ def test_runs_csv_rebuilds_from_logs_and_ignores_other_experiments_and_partials(
     (env.res / "day7check_haiku_default_runs.csv").write_text("stale\n", encoding="utf-8")   # 낡은 파일은 덮어쓴다
     assert env.run("--tasks", "E01", "--runs", "1", "--yes", "--no-probe") == batch.EXIT_OK
     assert [(r["task"], r["run"]) for r in read_csv_rows(env)] == [("E01", "1")]
+
+
+# ---------------- 실험 A: 설정 이름(--config-name), 이어하기 분리 ----------------
+
+def option_desc(call_options, tool="file_stats"):
+    import asyncio
+    srv = call_options.mcp_servers["t"]
+    r = asyncio.run(srv["instance"]._request_handlers["tools/list"].handler(None, None))
+    return {t.name: t.description for t in r.tools}[tool]
+
+
+def test_config_name_selects_tool_desc_version_and_file_label(env):
+    from src.agent import tool_variants
+    for name, label, version in [("short", "short", "short"), ("long", "long", "long"), ("long_directive", "longDirective", "long_directive"),
+                                 ("longDirective", "longDirective", "long_directive")]:
+        assert env.run("--experiment", "expA", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--config-name", name) == batch.EXIT_OK
+        log = env.out / f"expA_haiku_{label}_E01_run1.jsonl"
+        assert log.exists()
+        cfg = next(e for e in events(log) if e.get("kind") == "config")
+        assert cfg["config"]["tool_desc_version"] == version                       # 설정은 로그에 그대로 남는다
+        assert option_desc(env.fake.task_calls()[-1][1]) == tool_variants.VARIANT_DESCRIPTIONS[version]["file_stats"]
+        log.unlink()
+        (env.out / f"expA_haiku_{label}_summary.jsonl").unlink()
+
+
+def test_config_name_and_config_are_the_same_option_and_unknown_is_refused(env):
+    assert env.run("--experiment", "expA", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--config", "short") == batch.EXIT_OK
+    assert (env.out / "expA_haiku_short_E01_run1.jsonl").exists()
+    n = len(env.fake.calls)
+    assert env.run("--experiment", "expA", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--config-name", "medium") == batch.EXIT_REFUSED
+    assert len(env.fake.calls) == n                                                # 거부되면 호출 없음
+    a = batch.parse_args(["--experiment", "expA", "--all", "--config-name", "long_directive"])
+    assert a.config == "longDirective"                                            # 밑줄 이름은 파일명용 이름으로 바꾼다
+
+
+def test_resume_does_not_mix_baseline_and_expA_or_expA_variants(env):
+    run = lambda exp, cfg: env.run("--experiment", exp, "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", *(["--config-name", cfg] if cfg else []))  # noqa: E731
+    assert run("baseline", None) == batch.EXIT_OK
+    n0 = len(env.fake.task_calls())
+    assert run("expA", "short") == batch.EXIT_OK                                  # 베이스라인 로그가 있어도 건너뛰지 않는다
+    assert len(env.fake.task_calls()) == n0 + 1
+    assert run("expA", "short") == batch.EXIT_OK                                  # 같은 이름이면 건너뜀
+    assert len(env.fake.task_calls()) == n0 + 1
+    assert run("expA", "long") == batch.EXIT_OK                                   # 다른 변형은 별도 실행
+    assert len(env.fake.task_calls()) == n0 + 2
+    names = sorted(p.name for p in env.out.glob("*_E01_run1.jsonl"))
+    assert names == ["baseline_haiku_default_E01_run1.jsonl", "expA_haiku_long_E01_run1.jsonl", "expA_haiku_short_E01_run1.jsonl"]
+    import csv
+    for stem in ("baseline_haiku_default", "expA_haiku_short", "expA_haiku_long"):
+        with (env.res / f"{stem}_runs.csv").open(encoding="utf-8", newline="") as f:
+            assert [(r["task"], r["run"]) for r in csv.DictReader(f)] == [("E01", "1")]    # 실험/설정마다 CSV가 따로, 서로의 행이 없다
+    assert (env.res / "expA_haiku_short_summary_inv1.md").exists() and (env.res / "expA_haiku_long_summary_inv1.md").exists()
+
+
+def test_probe_file_name_carries_experiment_and_config_label(env):
+    assert env.run("--experiment", "expA", "--tasks", "E01", "--runs", "1", "--yes", "--config-name", "long_directive") == batch.EXIT_OK
+    assert (env.out / "probe_haiku_expA-longDirective_inv1_start.jsonl").exists()
