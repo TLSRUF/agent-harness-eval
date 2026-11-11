@@ -496,8 +496,18 @@ def build_summary(ctx: Ctx, reason: str | None, selection: list[tuple[loader.Tas
 
 
 def write_run_csv(path: Path, ctx: Ctx, selection: list[tuple[loader.Task, int]]) -> None:
+    """runs.csv는 이번 호출의 선택분이 아니라 out-dir의 이 실험/모델/설정 로그 전체에서 매번 다시 만든다(멱등).
+    selection은 받지만 쓰지 않는다(호출 형식 유지). .partial 보관본과 다른 실험/설정 로그는 제외한다."""
     import csv
-    rows = _collect(ctx.out_dir, ctx.a, ctx.cfg.model_short, selection)
+    prefix = f"{ctx.a.experiment}_{ctx.cfg.model_short}_{ctx.a.config}_"
+    pat = re.compile(re.escape(prefix) + r"([EMH]\d+)_run(\d+)\.jsonl")
+    tasks = {t.id: t for t in loader.load_all()}
+    found = []
+    for p in Path(ctx.out_dir).glob(prefix + "*.jsonl"):
+        m = pat.fullmatch(p.name)
+        if m and m.group(1) in tasks:
+            found.append((m.group(1), int(m.group(2))))
+    rows = _collect(ctx.out_dir, ctx.a, ctx.cfg.model_short, [(tasks[t], n) for t, n in sorted(found)])
     with Path(path).open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f, lineterminator="\n")
         w.writerow(["task", "run", "state", "passed", "failure_type", "num_turns", "total_cost_usd"] + [k for k, _ in TOKEN_KEYS])

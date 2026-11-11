@@ -194,3 +194,40 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 - 모델 호출 없이 five_hour를 읽는 방법: **찾지 못했다(확인 불가).** `ClaudeSDKClient`의 `get_server_info`, `get_context_usage`, `get_mcp_status`에는 한도 필드가 없다. `get_server_info`에는 `claude_code_version`과 계정 정보(이메일 포함)가 있어 로그에 저장하지 않는다. CLI 슬래시 명령 `/usage`("Show session cost, plan usage, and what's contributing to your limits")가 있으나 사람이 화면으로 보는 용도이고, 그 숫자가 `unifiedWindows.utilization`과 같은 값인지는 확인되지 않았다. 그래서 배치 시작/끝 값은 1턴 탐침 호출(기본 켜짐)이나 수동 인자(`--start-five-hour`, `--start-seven-day`)로 얻는다.
 - CLI 버전: SDK는 번들 CLI를 쓴다. `get_server_info()["claude_code_version"]`과 init 메시지가 둘 다 2.1.316이고, PATH의 `claude`는 2.1.322로 다르다. 재현성 필드 `repro.cli_version`에는 번들 CLI의 `--version`을 기록한다.
 - 탐침 호출(`probe_*` 파일): Haiku 5.5, 도구 없음(`tools=[]`, `allowed_tools=[]`), max_turns 1, HARNESS_ENV 적용, 설정 파일 불러오기 없음. 베이스라인 결과와 이어하기 감지에 섞이지 않는 별도 이름이다.
+
+
+## num_turns의 의미와 max_turns 20 (2026-11-11, 모델 호출 없음, 기존 로그 분석)
+
+### 관찰 (day7check 5건, 로그에서 직접 센 값)
+| 실행 | 고유 message_id 수 | tool_use 블록 수 | 도구 결과(UserMessage) 수 | 보고된 num_turns | 한 AssistantMessage 안 tool_use 2개 이상 | 한 message_id 아래 tool_use 분포(id 수) |
+|---|---|---|---|---|---|---|
+| H01 | 5 | 13 | 13 | 14 | 0건 | 0개 1, 1개 3, 10개 1 |
+| H02 | 7 | 17 | 17 | 18 | 0건 | 0개 1, 1개 5, 12개 1 |
+| H04 | 8 | 16 | 16 | 17 | 0건 | 0개 1, 1개 6, 10개 1 |
+| H05 | 6 | 15 | 15 | 16 | 0건 | 0개 1, 1개 3, 6개 2 |
+| H07 | 8 | 9 | 9 | 10 | 0건 | 0개 1, 1개 5, 2개 2 |
+- 5건 모두 **num_turns = tool_use 블록 수 + 1**(5/5). 고유 message_id 수 + 1과는 한 건도 맞지 않는다(0/5).
+- SDK는 한 API 응답(같은 message_id)의 블록을 블록마다 별도 AssistantMessage로 쪼개 기록한다. 그래서 "한 AssistantMessage 안에 tool_use가 2개 이상"은 0건이지만, **같은 message_id 아래 병렬 호출은 5건 모두에 있었다**(한 응답에 최대 12개: H02). 병렬 호출이 있던 응답 수: H01 1, H02 1, H04 1, H05 2, H07 2.
+- 도구 호출 수와 도구 결과 수가 모든 실행에서 같아서, "tool_use 블록 수 + 1"과 "도구 결과 메시지 수 + 1"은 이 데이터로 구분되지 않는다.
+
+### 가설 (확정 아님)
+- H1: num_turns = 모델 응답(고유 message_id) 수 (+1은 한계 도달 때만). **day7check로 기각**(H01: 응답 5, num_turns 14).
+- H2: num_turns = 도구 호출(tool_use 블록) 수 + 1. day7check 5건과 아래 Day 3 로그 전부와 모순 없음.
+- H3: num_turns = 도구 결과 메시지 수 + 1 (H2와 데이터상 구분 불가).
+- 확인 불가: SDK/CLI 내부에서 "턴"을 세는 규칙(번들 CLI 소스를 읽지 않았고 문서에서 정의를 찾지 못함).
+
+### Day 3 max_turns 실험과의 모순 검토 (maxturns_* 4건 + day3demo/day4check/day7smoke 로그 7건, 같은 방법으로 다시 셈)
+| 설정 max_turns | 보고 num_turns | subtype | 고유 message_id 수 | tool_use 수 |
+|---|---|---|---|---|
+| 1 | 2 | error_max_turns | 1 | 1 |
+| 2 | 3 | error_max_turns | 2 | 2 |
+| 3 | 4 | error_max_turns | 3 | 3 |
+| 5 | 5 | success | 5 | 4 |
+- 이 실험의 모든 응답에는 tool_use가 1개뿐이라(병렬 호출 없음) 응답 수와 호출 수가 같거나 1 차이였다. 그래서 **Day 3 데이터만으로는 H1과 H2를 구분할 수 없었다**. H1을 쓰려면 "한계에 걸리면 응답 수+1, 성공이면 응답 수"라는 예외 규칙이 필요하다. H2는 규칙 하나(호출 수 + 1)로 4건 모두와 day7check 5건, 나머지 로그 7건(E01 3+1, E11 1+1, E13 2+1, 데모 4+1 등)을 설명한다. 따라서 Day 3과 모순되지 않는다. 기존 문장 "한계에 걸리면 num_turns = max_turns + 1"은 H2에서는 "호출 수가 max_turns에 도달했으니 호출 수 + 1 = max_turns + 1"이라는 같은 현상의 한 경우다.
+- 한계 판정 규칙(관찰, 가설): max_turns=5에서 호출 4번 뒤 최종 답변이 나와 success(num_turns 5)였고, max_turns=3에서 호출 3번째에 error_max_turns(num_turns 4)였다. 즉 "num_turns가 max_turns를 넘으면 중단"으로 읽힌다(호출 수 + 1 > max_turns). 이 읽기는 설정 4개, 호출이 한 개씩인 경우의 관찰뿐이다.
+
+### max_turns 20의 의미와 H02, H04에 주는 영향
+- H2가 맞다면 max_turns 20은 "모델 응답 20번"이 아니라 **도구 호출 약 19번(호출 수 + 1 <= 20)**까지 허용하는 값이다. 병렬 호출은 응답이 아니라 호출마다 센다. 같은 한도에서 한 응답에 도구를 10개 내는 실행은 한 번에 10을 쓴다.
+- 관찰된 호출 수: H02 17(num_turns 18), H04 16(17), H05 15(16), H01 13(14), H07 9(10). H02는 한도까지 호출 2~3번, H04는 3~4번 남았다. 호출 수/min_steps 비는 1.15~1.33이었다. min_steps가 11~13인 과제는 6개(히스토그램: 11이 3개, 12가 1개, 13이 2개)이고, 이 비가 1.5 가까이 되면 19호출 근처가 된다(단순 곱, 가설). 따라서 **error_max_turns가 나올 가능성이 있는 과제는 min_steps 11 이상의 과제들**이다. 실제로 나올지는 베이스라인 전에는 확인 불가.
+- 확인 불가: 병렬 호출 한 응답이 한도를 한 번에 넘길 때 CLI가 어디서 중단하는지(응답 단위 검사인지 호출 단위 검사인지). 관찰된 병렬 응답은 모두 한도에서 멀었다(최대 18).
+- 영향 정리: ① 베이스라인은 max_turns 20을 바꾸지 않는다(config 기본값). ② error_max_turns가 나오면 `maxturns_fail`/`maxturns_pass`로 따로 집계된다. ③ Day 13(최대 턴 5/20)을 해석할 때 5는 "응답 5번"이 아니라 "도구 호출 약 4번"일 수 있다는 점을 명시한다. ④ 한도 판정 단위를 확인하려면 모델 호출이 필요하다(예: 병렬 호출이 많은 H02에 낮은 max_turns를 주고 중단 지점을 보는 시험). 사용자 승인 없이 하지 않았고 계획에만 둔다.
