@@ -64,7 +64,7 @@ Claude Agent SDK로 도구를 쓰는 에이전트를 구성하고, 40개 과제 
 
 \## 디렉터리 구조
 
-src/agent/ (runner\_agent.py, tools.py, config.py)
+src/agent/ (runner\_agent.py, tools.py, tool\_variants.py, config.py)
 
 src/eval/ (tasks/, graders.py, batch.py, report.py, baseline_report.py, freeze.py)
 

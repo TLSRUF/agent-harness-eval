@@ -4,6 +4,8 @@
 """
 from dataclasses import asdict, dataclass
 
+from .tool_variants import VARIANT_DESCRIPTIONS
+
 DEFAULT_MODEL = "claude-haiku-5-5"
 COMPARE_MODEL = "claude-sonnet-5-5"  # 실험 D 부분 실행 전용
 
@@ -31,6 +33,8 @@ class HarnessConfig:
             raise ValueError("Bash is not allowed in this harness")
         if self.prompt_version not in PROMPTS:
             raise ValueError(f"unknown prompt_version: {self.prompt_version}")
+        if self.tool_desc_version != "default" and self.tool_desc_version not in VARIANT_DESCRIPTIONS:
+            raise ValueError(f"unknown tool_desc_version: {self.tool_desc_version}")
 
     @property
     def system_prompt(self) -> str:

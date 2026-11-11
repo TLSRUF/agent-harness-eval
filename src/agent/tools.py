@@ -5,6 +5,7 @@ from typing import Any
 from claude_agent_sdk import HookMatcher, create_sdk_mcp_server, tool
 
 from .sandbox import SandboxError, check_builtin_tool_input, resolve_in_sandbox
+from .tool_variants import VARIANT_DESCRIPTIONS
 
 SERVER_NAME = "t"
 TOOL_NAMES = ["search_text", "file_stats", "check_result"]
@@ -14,7 +15,7 @@ BUILTIN_CANDIDATES = ["Read", "Write", "Edit", "Glob", "Grep"]
 MAX_RESULTS = 50
 MAX_FILE_BYTES = 1_000_000
 
-# 도구 설명 버전 (실험 A에서 short/long을 추가한다)
+# 도구 설명 버전. default만 여기에 있고(동결 대상), 실험 A 변형(short/long/long_directive)은 tool_variants.py에 있다
 DESCRIPTIONS: dict[str, dict[str, str]] = {
     "default": {
         "search_text": "Search for a text string in files under a folder. Returns matching lines as path:line:text.",
@@ -131,7 +132,7 @@ def check_result_impl(root: Path, path: str, contains: str = "", min_lines: int 
 def build_server(root: str | Path, desc_version: str = "default"):
     """root에 묶인 SDK MCP 서버를 만든다."""
     root = Path(root).resolve()
-    d = DESCRIPTIONS[desc_version]
+    d = DESCRIPTIONS[desc_version] if desc_version in DESCRIPTIONS else VARIANT_DESCRIPTIONS[desc_version]
 
     @tool("search_text", d["search_text"], SCHEMAS["search_text"])
     async def search_text(args: dict[str, Any]) -> dict[str, Any]:

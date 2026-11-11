@@ -196,3 +196,12 @@
 - 선택률: search_text 0/36(쌍 과제 N=12), Grep 사용 31/36. 일관성 (a) 49% (b) 42% (c) 40%(N=40, 과제당 3회). 턴 수 중앙값 4, 90번째 백분위 14, 최대 24, 모델 응답 수 중앙값 4, 최대 7.
 - 예측 대조(원문 기록은 위 '사용자 예측 기록'): 4번 Grep이 search_text보다 높음 = 맞음. 3번 error_max_turns(H02) = 틀림(0건). 2번 한 번이라도 실패하는 과제 = A(1~2개) 틀림, 0개(B). 1번 전체 성공률 = 전부 성공(B) 맞음. (1, 2번의 A/B 선택은 사용자가 따로 알려 주기로 함: 표기는 사용자 알림 후 확정)
 - 관찰: num_turns 21~24인 성공 실행 3건(H01_run2, H04_run2, H04_run3)이 max_turns=20에서 error_max_turns 없이 끝났다. Day 8 준비 때 쓴 "max_turns 20 = 도구 호출 약 19번" 해석은 틀렸고, 한도는 모델 응답 수 기준으로 보인다(가설). docs/sdk_notes.md 정정 절, README, plan.md Day 13 줄 갱신.
+## 실험 A 구현 — 단위 테스트 첫 실행 기록 (구현 전)
+- 테스트를 구현보다 먼저 작성: tests/test_tool_variants.py(13개 정도: default 동결 유지와 변형 모듈 분리, config 검증, 변형 3개의 이름/입력 스키마가 default와 같고 설명만 다름, 동작이 default와 동일, 길이 순서 short < default < long < long_directive, long에는 우선 사용 지시 단어 없음, long_directive = long + 문장 하나, 설명에 과제 프롬프트/정답/fixture 파일명/과제 ID/예시 값 미포함)와 tests/test_batch.py 4개(`--config-name`, 설정 이름 밑줄 변환, 베이스라인/expA/변형 간 이어하기 분리와 csv 분리, 탐침 파일명).
+- 구현 전 실행: test_tool_variants.py는 모듈이 없어 수집 단계 ImportError. test_batch.py는 새 4개 실패(--config-name 미지원 argparse 오류, 설정 이름 short 미등록 REFUSED, tool_variants ImportError), 기존 41개 통과. 모두 아직 구현하지 않은 기능 때문이며 예상과 같다. 위치별: 구현 전 상태, 테스트 코드 0.
+- 설계 결정(동결 대상 밖): 변형 이름 long_directive는 CLAUDE.md의 "설정 이름에 밑줄 금지" 규칙과 충돌하므로 로그의 tool_desc_version 값은 long_directive 그대로 두고, 파일명/배치 설정 이름은 longDirective로 쓴다(`--config-name long_directive`는 longDirective로 바꿔 받는다).
+## 실험 A 구현 — 구현 후 결과 (Day 9 분량)
+- 구현: src/agent/tool_variants.py(변형 short, long, long_directive는 별도 모듈, default는 tools.py의 동결 정의 그대로), HarnessConfig가 모르는 tool_desc_version을 거부, build_server가 변형을 읽음, batch.py에 `--config-name`(`--config`와 같은 옵션; short, long, longDirective, long_directive도 받음)과 CONFIGS 3개 추가.
+- 구현 후 첫 실행: tests/test_tool_variants.py + tests/test_batch.py 60개 중 59개 통과, 1개 실패. 실패 = 예시 값 검사: 첫 예시 단어 'archive'가 fixture 안 텍스트에 이미 있었다(위치: 설명 문구 예시 값). 어떤 과제/fixture에도 없는 값('basalt', 'vault', 'vault/q7.txt')으로 바꿔 통과. 음성 대조 6가지(build_server가 변형 무시, long에 지시어 삽입, default 설명 한 글자 변경, 설정 이름 변환 제거, 지시 문장 중복, config 검증 제거) 모두 해당 테스트가 실패.
+- 확인: `freeze --verify` "동결 일치"(도구 정의 v1 해시와 config 기본값 해시 불변), 전체 테스트는 아래 최종 값 참고. MANIFEST 대상 파일은 바꾸지 않았다. 변형 설명 길이(글자 수)는 tests가 short < default < long < long_directive 순서를 확인한다.
+- 위치별 버그: 설명 문구 1(예시 단어가 fixture와 겹침), 러너 0, 테스트 코드 0.
