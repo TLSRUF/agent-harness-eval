@@ -17,6 +17,7 @@
 
 - `file_stats` 도구는 `str.splitlines()`를 써서 낱개 CR, U+2028 등도 줄바꿈으로 세며, 평가 fixture에는 이런 문자가 없다.
 - 쉬움·보통은 min_steps가 대부분 2 이하이고 어려움은 모두 3 이상이라, 단계 수의 효과와 과제 유형의 효과를 분리할 수 없다.
+- num_turns와 max_turns는 모델 응답 수가 아니라 도구 호출 수 기준으로 보이며(가설, day7check 5건과 Day 3 실험에서 num_turns = 도구 호출 수 + 1), max_turns=20은 도구 호출 약 19번까지를 뜻한다. 한 응답 안의 병렬 호출은 호출마다 센다.
 
 ## 기여 안내 / Contributions
 
