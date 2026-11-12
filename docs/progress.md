@@ -210,3 +210,16 @@
 - 구현 후 첫 실행: 24개 중 첫 실행은 22개 통과, 2개 실패(예상 밖). 실패 1 = 과제별 표의 쌍 이름 `search_text|Grep`의 `|`가 마크다운 표 칸을 깨뜨림(구현 버그, 위치: 표 출력). 실패 2 = 효과 0, 범위 0 경계를 '확인 불가'로 처리(규칙 정의 문제: 효과가 0이면 큼이 아니므로 '작음'으로 정함, 위치: judge). 그 뒤 모든 표의 열 수 일치 테스트를 추가했더니 4절 판정 문구의 `|효과|`도 표를 깨뜨리고 있어 실패(구현 버그) -> '효과 크기'로 변경. 최종 24개 통과.
 - 음성 대조 7가지(우연 범위 min 사용, 입력 토큰에서 캐시 제외, check_result를 쌍 과제로 제한, 지시 효과 부호, 탐침 창 끝 무시, search_text 범위를 전체 과제로, 경고 기준 변경) 모두 테스트 실패. 전체 794개 통과, freeze --verify 동결 일치. 위치별 버그: 구현 2(표 깨짐 2곳), 규칙 정의 1, 테스트 코드 0.
 - 실행 결과(실험 A 360회 + baseline 120회, 읽기 전용): 정보 효과(long-default) search_text +13.9pp, file_stats +37.5pp(표본 24건 < 30 경고), 쌍 합산 +23.3pp. 지시 효과(long_directive-long) search_text +13.9pp, file_stats +0.0pp, 합산 +8.3pp. 반복 간 범위(합산 5.0pp, search_text 8.3pp)보다 모두 큼(file_stats 지시 효과는 0이라 작음). 성공률 default 100%, short 98%, long 95%, long_directive 98%(error_max_turns 0). 비용 합계 default $0.1973(40회 $0.0604 + 80회 $0.1369), short $0.1836, long $0.1559, long_directive $0.1547. five_hour 델타 short +0.04, long +0.01, long_directive +0.01.
+## 실험 A 후속 — 견고성 섹션(exp_compare 6절) 테스트 첫 실행 기록 (구현 전)
+- 테스트를 구현보다 먼저 추가: 설정별 '커스텀 도구를 한 번이라도 쓴 과제 수'(search_text 쌍 12개 중, file_stats 쌍 8개 중, 3회 모두 쓴 과제 수 병기), default 대비 long, long_directive에서 늘어난/줄어든/같은 과제 목록, 설정 누락 시 n/a, 소표본 경고. 섹션 제목 목록(6개)도 갱신.
+- 구현 전 실행: 28개 중 5개 실패(6절 없음 ValueError 4개 + 제목 목록 불일치 1개), 기존 23개 통과. 아직 구현하지 않은 기능 때문이며 예상과 같다. 위치별 버그: 구현 전 상태, 테스트 코드 0.
+## 실험 B 구현 — 단위 테스트 첫 실행 기록 (구현 전)
+- 테스트를 구현보다 먼저 작성: tests/test_prompt_variants.py(v1 동결 유지와 변형 모듈 분리, config 검증, 변형 = v1 + 추가 문장만, verify_tool = verify + 문장 하나, 추가 문장에 도구 이름/과제/정답/숫자 없음, 변형을 골라도 도구 설명은 default이고 설정은 prompt_version만 다름), tests/test_batch.py 5개(`--prompt-version`, 설정 이름 별칭, 충돌/모르는 값 거부, baseline/expA/expB 이어하기와 csv 분리, 탐침 파일명), tests/test_exp_compare.py 7개(실험 B 비교표).
+- 구현 전 실행: test_prompt_variants.py는 모듈이 없어 수집 단계 ImportError. test_batch.py 새 5개 실패(`--prompt-version` 미지원 argparse 오류), 기존 80개 통과. test_exp_compare.py 새 7개는 통과 — 정직하게 적으면, exp_compare의 실험 B 확장 코드를 6절(견고성) 패치와 한 번에 먼저 넣었기 때문에 B 테스트는 코드 뒤에 작성했다(테스트를 실행하기 전에 쓰긴 했지만 '구현 전 실패'를 확인하지 못했다). 대신 음성 대조(변이)로 보완한다.
+- 위치별 버그: 구현 전 상태, 테스트 코드 0. 절차 위반 1(exp_compare B 확장).
+## 실험 A 후속 + 실험 B 구현 (한 일 / 숫자 / 다음)
+- 한 일: expA 실패 12건 원인 분석(docs/failure_analysis.md), exp_compare 6절(견고성) 추가, 실험 B 구현(prompt_variants.py의 verify, verify_tool, 러너 `--prompt-version`, exp_compare `--exp B`), expA 한계 한 줄을 README, README.en, sdk_notes에 추가.
+- 숫자(실패 분석): 12건 모두 (a) 에이전트 실수, (b) 0, (c) 0, (d) 확인된 것 0(가설 2). 커스텀 결과 잘림 0/866건(최대 23줄, MAX_RESULTS 50). 세기 과제 36건 중 Grep count 모드를 쓴 16건 실패 0, 안 쓴 20건 실패 7(사후 분석, 단측 약 0.009). H01 5건은 모두 같은 짝 오류(app_07의 2675를 app_08에 씀).
+- 숫자(견고성): search_text를 한 번이라도 쓴 쌍 과제는 default 0/12, short 0/12, long 2/12, long_directive 5/12. file_stats는 6/8, 6/8, 8/8, 8/8. default 대비 줄어든 과제 0개.
+- 숫자(구현): 전체 테스트 821개 통과, freeze --verify 동결 일치, 음성 대조 9가지 모두 테스트 실패. 절차 위반 1건(exp_compare B 확장 코드를 테스트보다 먼저 넣음)은 위 기록에 적음.
+- 다음 할 일: 사용자가 expB 2배치(verify, verify_tool 각 120회)를 실행 -> `python -m src.eval.exp_compare --exp B`.

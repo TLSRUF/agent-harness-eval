@@ -625,3 +625,64 @@ def test_resume_does_not_mix_baseline_and_expA_or_expA_variants(env):
 def test_probe_file_name_carries_experiment_and_config_label(env):
     assert env.run("--experiment", "expA", "--tasks", "E01", "--runs", "1", "--yes", "--config-name", "long_directive") == batch.EXIT_OK
     assert (env.out / "probe_haiku_expA-longDirective_inv1_start.jsonl").exists()
+
+
+# ---------------- 실험 B: --prompt-version, expB, 이어하기 분리 ----------------
+
+def test_prompt_version_option_selects_prompt_and_file_label(env):
+    from src.agent import config as hc
+    from src.agent.tools import DESCRIPTIONS
+    for pv_name, label in [("verify", "verify"), ("verify_tool", "verifyTool"), ("v1", "default")]:
+        assert env.run("--experiment", "expB", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--prompt-version", pv_name) == batch.EXIT_OK
+        log = env.out / f"expB_haiku_{label}_E01_run1.jsonl"
+        assert log.exists(), label
+        cfg = next(e for e in events(log) if e.get("kind") == "config")
+        assert cfg["config"]["prompt_version"] == pv_name and cfg["config"]["tool_desc_version"] == "default"   # 설정은 로그에 그대로 남는다
+        opts = env.fake.task_calls()[-1][1]
+        assert opts.system_prompt == (hc.PROMPTS["v1"] if pv_name == "v1" else hc.VARIANT_PROMPTS[pv_name])
+        assert option_desc(opts) == DESCRIPTIONS["default"]["file_stats"]
+
+
+def test_config_name_can_select_prompt_variants_too_and_underscore_alias_works(env):
+    a = batch.parse_args(["--experiment", "expB", "--all", "--config-name", "verify_tool"])
+    assert a.config == "verifyTool"
+    assert env.run("--experiment", "expB", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--config-name", "verifyTool") == batch.EXIT_OK
+    assert (env.out / "expB_haiku_verifyTool_E01_run1.jsonl").exists()
+
+
+def test_prompt_version_conflicts_and_unknown_values_are_refused_without_calls(env):
+    n = len(env.fake.calls)
+    base = ["--experiment", "expB", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe"]
+    assert env.run(*base, "--prompt-version", "v2") == batch.EXIT_REFUSED                         # 모르는 버전
+    assert env.run(*base, "--config-name", "short", "--prompt-version", "verify") == batch.EXIT_REFUSED   # 변수 둘을 한 번에 바꾸는 조합
+    assert env.run(*base, "--config-name", "verify", "--prompt-version", "verify_tool") == batch.EXIT_REFUSED   # 서로 다른 변형
+    assert len(env.fake.calls) == n
+    assert env.run(*base, "--config-name", "verify", "--prompt-version", "verify") == batch.EXIT_OK            # 같은 변형이면 허용
+
+
+def test_resume_does_not_mix_baseline_expA_and_expB(env):
+    import csv
+    run = lambda exp, *extra: env.run("--experiment", exp, "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", *extra)  # noqa: E731
+    assert run("baseline") == batch.EXIT_OK
+    n0 = len(env.fake.task_calls())
+    assert run("expA", "--config-name", "short") == batch.EXIT_OK
+    assert run("expB", "--prompt-version", "verify") == batch.EXIT_OK                  # 다른 실험이라 건너뛰지 않는다
+    assert len(env.fake.task_calls()) == n0 + 2
+    assert run("expB", "--prompt-version", "verify") == batch.EXIT_OK                  # 같은 이름이면 건너뜀
+    assert len(env.fake.task_calls()) == n0 + 2
+    assert run("expB", "--prompt-version", "verify_tool") == batch.EXIT_OK             # 다른 변형은 별도 실행
+    assert run("expB", "--config-name", "verifyTool") == batch.EXIT_OK                 # 같은 변형을 다른 옵션 이름으로 줘도 같은 파일 -> 건너뜀
+    assert len(env.fake.task_calls()) == n0 + 3
+    names = sorted(p.name for p in env.out.glob("*_E01_run1.jsonl"))
+    assert names == ["baseline_haiku_default_E01_run1.jsonl", "expA_haiku_short_E01_run1.jsonl",
+                     "expB_haiku_verifyTool_E01_run1.jsonl", "expB_haiku_verify_E01_run1.jsonl"]
+    for stem in ("baseline_haiku_default", "expA_haiku_short", "expB_haiku_verify", "expB_haiku_verifyTool"):
+        with (env.res / f"{stem}_runs.csv").open(encoding="utf-8", newline="") as f:
+            assert [(r["task"], r["run"]) for r in csv.DictReader(f)] == [("E01", "1")]        # 실험/설정마다 CSV가 따로
+    assert (env.res / "expB_haiku_verify_summary_inv1.md").exists() and (env.res / "expB_haiku_verifyTool_summary_inv1.md").exists()
+
+
+def test_probe_file_name_for_expB(env):
+    assert env.run("--experiment", "expB", "--tasks", "E01", "--runs", "1", "--yes", "--prompt-version", "verify_tool") == batch.EXIT_OK
+    assert (env.out / "probe_haiku_expB-verifyTool_inv1_start.jsonl").exists()
+    assert (env.out / "probe_haiku_expB-verifyTool_inv1_end.jsonl").exists()

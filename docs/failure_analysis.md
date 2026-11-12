@@ -1,0 +1,45 @@
+# 실패 분석
+
+## 실험 A 실패 12건 (short 3, long 6, long_directive 3) — 읽기 전용 분석, 모델 호출 없음
+
+대상: results/raw의 expA 실행 360건 중 채점 실패 12건. 모두 failure_type = wrong_value. error_max_turns는 0건, 다른 failure_type은 없다.
+기준은 CLAUDE.md의 분류 (a) 에이전트 실수 (b) 프롬프트 모호 (c) 채점 기준 문제, 그리고 이번 요청의 (d) 도구 자체의 동작 한계.
+에이전트가 만든 출력은 results/raw/*_final/ 스냅샷에서, 기대 정답은 과제 JSON에서 읽었다.
+
+| 설정 | 과제 | run | failure_type | 에이전트 출력 | 기대 정답 | 도구 순서(이름만) | 커스텀 결과 잘림 | 분류 |
+|---|---|---|---|---|---|---|---|---|
+| short | M05 | 2 | wrong_value | 줄 수: 18 | 줄 수: 17 | Read, Grep, Write | 아니오 | (a) 세기 실수. Grep 출력은 정확히 17줄 |
+| short | M07 | 1 | wrong_value | 줄 수: 13 | 줄 수: 14 | Glob, Grep, Write, check_result | 아니오 | (a) 세기 실수. Grep 출력은 정확히 14줄 |
+| short | M07 | 2 | wrong_value | 줄 수: 13 | 줄 수: 14 | Glob, Grep, Write, check_result | 아니오 | (a) 세기 실수. Grep 출력은 정확히 14줄 |
+| long | H01 | 1 | wrong_value | app_08.log: 2675 / app_03.log: 2493 / app_05.log: 2306 | app_07.log: 2675 / app_03.log: 2493 / app_05.log: 2306 | Glob, file_stats x10, Write, check_result | 아니오 | (a) 파일 이름과 값의 짝을 잘못 씀. 도구 결과 10개는 모두 맞음 |
+| long | H01 | 2 | wrong_value | (위와 같음) | (위와 같음) | Glob, file_stats x10, Write, check_result | 아니오 | (a) 위와 같음 |
+| long | H01 | 3 | wrong_value | (위와 같음) | (위와 같음) | Glob, file_stats x10, Write | 아니오 | (a) 위와 같음 |
+| long | M01 | 1 | wrong_value | 줄 수: 25 | 줄 수: 23 | search_text, Write | 아니오 | (a) 세기 실수. search_text 출력은 정확히 23줄 |
+| long | M01 | 3 | wrong_value | 줄 수: 24 | 줄 수: 23 | search_text, Grep, Write | 아니오 | (a) 세기 실수. search_text와 Grep 출력 모두 정확히 23줄 |
+| long | M07 | 3 | wrong_value | 줄 수: 13 | 줄 수: 14 | Glob, Grep, Write, check_result | 아니오 | (a) 세기 실수. Grep 출력은 정확히 14줄 |
+| long_directive | H01 | 2 | wrong_value | app_08.log: 2675 / app_03.log: 2493 / app_05.log: 2306 | app_07.log: 2675 / app_03.log: 2493 / app_05.log: 2306 | Glob, file_stats x10, Write, check_result | 아니오 | (a) H01 long과 같은 오류 |
+| long_directive | H01 | 3 | wrong_value | (위와 같음) | (위와 같음) | Glob, file_stats x10, Write | 아니오 | (a) 위와 같음 |
+| long_directive | M07 | 1 | wrong_value | 줄 수: 13 | 줄 수: 14 | Glob, search_text, Grep, Write, check_result | 아니오 | (a) 세기 실수. search_text와 Grep 출력 모두 정확히 14줄 |
+
+### 분류 요약
+- (a) 에이전트의 절차/계산 실수: 12건 모두. 근거: 12건 모두 도구 출력은 정확했다(줄 수 출력은 기대한 줄 수와 같고, H01은 file_stats 10개 결과가 모두 맞았다). 에이전트가 센 값이나 짝지은 이름이 틀렸다.
+- (b) 프롬프트가 모호했음: 0건. 근거: 12건 중 모호한 문장에서 비롯한 오류는 없었다(세기 과제는 "몇 줄인지", H01은 파일명과 단어 수 형식을 명시). 단 에이전트 생각(thinking)이 로그에 비어 있어(signature만 있음) 에이전트 내부 해석은 확인 불가.
+- (c) 채점 기준 문제: 0건. 근거: 채점은 기대 정답과 문자열을 비교하고, 기대 정답은 사람이 손으로 대조해 동결한 값이며(hand_check와 도구 결과가 일치: H01 단어 수 2675/2493/2306, M07 14줄 등), 오답 출력은 실제로 값이 다르다.
+- (d) 도구 자체의 동작 한계: 확인된 것은 0건. 단 가설 2개를 남긴다.
+  - H01: file_stats 출력은 `lines=N words=N bytes=N` 형식이라 파일 이름이 들어 있지 않다. 한 응답에서 10개를 병렬 호출하면 결과를 호출 순서로 짝지어야 한다. 실패 5건이 모두 같은 오류(7번째 파일 app_07의 2675를 app_08에 붙임)를 냈으므로 우연한 세기 실수보다 같은 원인이 있어 보인다. 그러나 같은 형식, 같은 병렬 호출(10개)을 한 default 2건과 short 2건은 정답이었다. 도구 출력은 모든 설정에서 같으므로 출력 형식만으로는 설명되지 않고, long 계열 설명이 에이전트 행동을 바꿨을 가능성이 있다(가설, 확인 불가).
+  - M01, M05, M07(세기 과제 7건): search_text 출력에는 일치 줄 수 요약이 없다. 내장 Grep은 `output_mode: count`로 "Found 23 total occurrences"처럼 개수를 직접 준다. 확인한 사실: M01 default는 3회 모두 Grep count 모드를 먼저 호출해 23을 받은 뒤 내용을 확인했다. 세기 과제 3개 x 설정 4개 x 3회 = 36건 중 count 모드를 쓴 16건은 실패 0건, 쓰지 않은 20건(내용 줄을 직접 센 경우)은 실패 7건(7건 모두 여기). 우연히 이 정도로 몰릴 확률은 단측 약 0.009(사후 분석, 다중 비교 보정 없음, 탐색용). count 모드 사용 비율은 default 6/9, short 5/9, long 1/9, long_directive 4/9로, long에서 가장 적다. 해석(가설): long 설명이 search_text 쪽으로 선택을 옮기면서 개수 요약을 받지 못하고 직접 세다가 틀렸을 수 있다. 확인 불가(생각 내용 비공개, 인과 미검증).
+
+### 잘림, 길이 제한 확인 (H01, M01 요청 사항)
+- `src/agent/tools.py`: search_text는 결과를 최대 `MAX_RESULTS = 50`개로 자르고 `(truncated at 50)`을 붙인다. 읽는 파일 크기는 `MAX_FILE_BYTES = 1_000_000` 이하만 읽는다(초과 파일은 search_text에서 건너뛰고 file_stats에서는 오류). file_stats에는 결과 개수 제한이 없다.
+- 실제 로그: 커스텀 도구 결과 866건(baseline 포함 expA 4개 설정) 중 `truncated` 표시가 있는 것 0건, 한 결과의 최대 줄 수 23줄(M01). 가장 큰 fixture 파일은 27,077바이트(M03 orders.log)라 1,000,000바이트 한계와 거리가 멀다. M01 search_text 결과 23건 < 50, H01 file_stats 결과는 파일당 한 줄. 따라서 H01, M01 모두 도구가 결과를 잘라서 생긴 오류는 아니다.
+
+### default가 3/3 통과였던 점 검토
+- (b)나 (c)였다면 default도 같은 결함으로 실패해야 하는데 default는 이 4개 과제(H01, M01, M05, M07) x 3회 = 12건 모두 통과했고, 위에서 (b), (c)는 근거가 없다. 다음 이유로 베이스라인 통과는 결함을 가리는 우연이 아니다.
+  - 정답 풀이 40개가 채점을 통과한다(동결 검증).
+  - H01 default는 file_stats x10(2건)이나 Read x10 + Grep(1건)으로 정답을 만들었고 같은 채점기를 통과했다. 같은 프롬프트에서 expA long 3/3, long_directive 2/3이 틀린 것은 에이전트 행동 차이다.
+  - M01 default는 Grep 2번(count 모드로 23을 받고 내용 모드로 확인)으로 3/3 통과, M05 default는 Grep count 3/3, M07 default는 Grep content 3/3 통과(M07 default는 count 없이 직접 세어 14를 맞춤). expA 실패는 M07 4건, M01 2건, M05 1건으로 세기 과제에 모여 있고 도구 출력은 모두 정확했다.
+- 따라서 베이스라인 무효화나 재동결이 필요한 사유는 없다. 필요했다면 MANIFEST 대상 파일 변경이므로 멈추고 알렸을 것이다.
+
+### 해석 시 주의 (가설, 사후 분석)
+- long 계열에서 H01 5/6 실패(default, short는 file_stats 호출 4건 중 0건 실패)는 사후에 본 패턴이다. 단순 계산(실패 5건이 long 계열 6건에 몰릴 확률, 단측 6/252 ≈ 0.024)은 탐색용이고 다중 비교 보정을 하지 않았다. 원인(설명 문구, 호출 순서, 확률적 변동)은 확인 불가.
+- M07의 설정별 실패는 default 0/3, short 2/3, long 1/3, long_directive 1/3이다. 모두 내장 Grep(또는 search_text와 Grep) 출력의 14줄을 13으로 센 오류이며, 설정이 실패율을 올렸는지 우연인지는 확인 불가(표본이 과제 1개 x 3회).
