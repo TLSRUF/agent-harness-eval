@@ -686,3 +686,149 @@ def test_probe_file_name_for_expB(env):
     assert env.run("--experiment", "expB", "--tasks", "E01", "--runs", "1", "--yes", "--prompt-version", "verify_tool") == batch.EXIT_OK
     assert (env.out / "probe_haiku_expB-verifyTool_inv1_start.jsonl").exists()
     assert (env.out / "probe_haiku_expB-verifyTool_inv1_end.jsonl").exists()
+
+
+# ---------------- 실험 C: --max-turns (3, 4, 5, 7만), 실험 D: --model (haiku, sonnet만) ----------------
+
+def _opts_ok(env):
+    return env.fake.task_calls()[-1][1]
+
+
+@pytest.mark.parametrize("n", [3, 4, 5, 7])
+def test_max_turns_option_sets_max_turns_and_file_label_and_keeps_everything_else_default(env, n):
+    from src.agent import config as hc
+    from src.agent.tools import DESCRIPTIONS
+    assert env.run("--experiment", "expC", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--max-turns", str(n)) == batch.EXIT_OK
+    log = env.out / f"expC_haiku_maxTurns{n}_E01_run1.jsonl"
+    assert log.exists()
+    cfg = next(e for e in events(log) if e.get("kind") == "config")["config"]
+    assert cfg["max_turns"] == n and cfg["prompt_version"] == "v1" and cfg["tool_desc_version"] == "default" and cfg["model"] == hc.DEFAULT_MODEL
+    o = _opts_ok(env)
+    assert o.max_turns == n and o.system_prompt == hc.PROMPTS["v1"] and option_desc(o) == DESCRIPTIONS["default"]["file_stats"] and o.model == hc.DEFAULT_MODEL
+
+
+def test_config_default_max_turns_is_untouched_and_only_3_4_5_7_are_accepted(env):
+    assert HarnessConfig().max_turns == 20
+    n = len(env.fake.calls)
+    base = ["--experiment", "expC", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe"]
+    for bad in ["20", "6", "2", "8", "0", "-1", "10"]:
+        assert env.run(*base, "--max-turns", bad) == batch.EXIT_REFUSED, bad
+    assert len(env.fake.calls) == n                                                    # 거부되면 호출 없음
+    assert batch.ALLOWED_MAX_TURNS == (3, 4, 5, 7)
+
+
+def test_max_turns_conflicts_with_other_variables_are_refused(env):
+    n = len(env.fake.calls)
+    base = ["--experiment", "expC", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe"]
+    assert env.run(*base, "--max-turns", "3", "--config-name", "short") == batch.EXIT_REFUSED
+    assert env.run(*base, "--max-turns", "3", "--prompt-version", "verify") == batch.EXIT_REFUSED
+    assert env.run(*base, "--max-turns", "3", "--model", "claude-sonnet-5-5") == batch.EXIT_REFUSED
+    assert env.run(*base, "--max-turns", "3", "--config-name", "maxTurns4") == batch.EXIT_REFUSED
+    assert len(env.fake.calls) == n
+    assert env.run(*base, "--max-turns", "3", "--config-name", "maxTurns3") == batch.EXIT_OK              # 같은 변형이면 허용
+
+
+def test_resume_does_not_mix_baseline_expA_expB_expC(env):
+    import csv
+    run = lambda exp, *extra: env.run("--experiment", exp, "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", *extra)  # noqa: E731
+    assert run("baseline") == batch.EXIT_OK
+    n0 = len(env.fake.task_calls())
+    assert run("expA", "--config-name", "short") == batch.EXIT_OK
+    assert run("expB", "--prompt-version", "verify") == batch.EXIT_OK
+    assert run("expC", "--max-turns", "3") == batch.EXIT_OK
+    assert len(env.fake.task_calls()) == n0 + 3                                      # 다른 실험이라 모두 새로 실행
+    assert run("expC", "--max-turns", "3") == batch.EXIT_OK                          # 같은 이름이면 건너뜀
+    assert run("expC", "--max-turns", "4") == batch.EXIT_OK                          # 다른 값은 별도 실행
+    assert len(env.fake.task_calls()) == n0 + 4
+    names = sorted(p.name for p in env.out.glob("*_E01_run1.jsonl"))
+    assert names == ["baseline_haiku_default_E01_run1.jsonl", "expA_haiku_short_E01_run1.jsonl", "expB_haiku_verify_E01_run1.jsonl",
+                     "expC_haiku_maxTurns3_E01_run1.jsonl", "expC_haiku_maxTurns4_E01_run1.jsonl"]
+    for stem in ("baseline_haiku_default", "expA_haiku_short", "expB_haiku_verify", "expC_haiku_maxTurns3", "expC_haiku_maxTurns4"):
+        with (env.res / f"{stem}_runs.csv").open(encoding="utf-8", newline="") as f:
+            assert [(r["task"], r["run"]) for r in csv.DictReader(f)] == [("E01", "1")]
+
+
+def test_probe_file_name_for_expC(env):
+    assert env.run("--experiment", "expC", "--tasks", "E01", "--runs", "1", "--yes", "--max-turns", "5") == batch.EXIT_OK
+    assert (env.out / "probe_haiku_expC-maxTurns5_inv1_start.jsonl").exists()
+
+
+def test_model_option_selects_sonnet_and_keeps_everything_else_default(env):
+    from src.agent import config as hc
+    from src.agent.tools import DESCRIPTIONS
+    assert env.run("--experiment", "expD", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--model", "claude-sonnet-5-5") == batch.EXIT_OK
+    log = env.out / "expD_sonnet_default_E01_run1.jsonl"
+    assert log.exists()
+    cfg = next(e for e in events(log) if e.get("kind") == "config")["config"]
+    assert cfg["model"] == "claude-sonnet-5-5" and cfg["max_turns"] == 20 and cfg["prompt_version"] == "v1" and cfg["tool_desc_version"] == "default"
+    o = _opts_ok(env)
+    assert o.model == "claude-sonnet-5-5" and o.max_turns == 20 and o.system_prompt == hc.PROMPTS["v1"]
+    assert option_desc(o) == DESCRIPTIONS["default"]["file_stats"]
+    assert env.run("--experiment", "expD", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--model", "claude-haiku-5-5") == batch.EXIT_OK
+    assert (env.out / "expD_haiku_default_E01_run1.jsonl").exists()                   # haiku를 명시해도 기본 설정과 같다
+
+
+def test_model_option_rejects_other_models_and_combinations_without_calls(env):
+    n = len(env.fake.calls)
+    base = ["--experiment", "expD", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe"]
+    assert env.run(*base, "--model", "claude-opus-5-5") == batch.EXIT_REFUSED
+    assert env.run(*base, "--model", "sonnet") == batch.EXIT_REFUSED
+    assert env.run(*base, "--model", "claude-sonnet-5-5", "--config-name", "short") == batch.EXIT_REFUSED
+    assert env.run(*base, "--model", "claude-sonnet-5-5", "--prompt-version", "verify") == batch.EXIT_REFUSED
+    assert len(env.fake.calls) == n
+    assert batch.ALLOWED_MODELS == ("claude-haiku-5-5", "claude-sonnet-5-5")
+
+
+def test_guard_and_preflight_work_the_same_for_sonnet(env):
+    from src.agent import guard
+    from src.agent.runner_agent import build_options
+    from src.agent.config import COMPARE_MODEL
+    h, s = HarnessConfig(), HarnessConfig(model=COMPARE_MODEL)
+    assert guard.allowed_tool_names(h) == guard.allowed_tool_names(s)                 # 허용 도구 목록은 모델과 무관
+    assert guard.unexpected_tools(ALLOWED + ["mcp__x__y"], s) == ["mcp__x__y"]
+    guard.check_init_tools(ALLOWED, s)
+    with pytest.raises(ToolGuardError):
+        guard.check_init_tools(ALLOWED + ["WebFetch"], s)
+    seen = []
+
+    async def spy_preflight(cfg):
+        seen.append(cfg.model)
+        return {"servers": ["t"], "mcp_tool_tokens": 0}
+    assert env.run("--experiment", "expD", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--model", COMPARE_MODEL, preflight=spy_preflight) == batch.EXIT_OK
+    assert seen == [COMPARE_MODEL]                                                    # preflight가 sonnet 설정으로 불렸다
+    ho, so = build_options(h, Path(".")), build_options(s, Path("."))
+    for attr in ("tools", "allowed_tools", "permission_mode", "setting_sources", "env", "max_turns", "system_prompt"):
+        assert getattr(ho, attr) == getattr(so, attr), attr
+    # 도구 가드 위반은 sonnet에서도 실행을 중단시킨다
+    bad = Fake(lambda p, o: ([init_msg(ALLOWED + ["WebFetch"]), rate_event(), result_msg()], None))
+    n_logs = len(list(env.out.glob("expD_sonnet*_E02_*")))
+    rc = env.run("--experiment", "expD", "--tasks", "E02", "--runs", "1", "--yes", "--no-probe", "--model", COMPARE_MODEL, fake=bad)
+    assert rc != batch.EXIT_OK and n_logs == 0
+
+
+def test_cost_bounds_are_not_borrowed_from_another_model(env, capsys):
+    write_log(env.out / "baseline_haiku_default_E01_run1.jsonl", [{"kind": "config"}, {"kind": "summary", **S(task_id="E01", total_cost_usd=0.002)}])
+    assert batch.measured_cost_bounds(env.out, "haiku") == {"E": {"max": 0.002, "n": 1}}
+    assert batch.measured_cost_bounds(env.out, "sonnet") == {}                        # haiku 측정값을 sonnet 상한으로 쓰지 않는다
+    assert batch.measured_cost_bounds(env.out) == {"E": {"max": 0.002, "n": 1}}      # 인자 없으면 기존 동작
+    assert env.run("--experiment", "expD", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--model", "claude-sonnet-5-5") == batch.EXIT_OK
+    out = capsys.readouterr().out
+    assert "건당 비용 상한 쉬움(E): 측정 전" in out and "$0.0020" not in out
+
+
+def test_resume_does_not_mix_haiku_baseline_and_sonnet_expD(env):
+    run = lambda exp, *extra: env.run("--experiment", exp, "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", *extra)  # noqa: E731
+    assert run("baseline") == batch.EXIT_OK
+    n0 = len(env.fake.task_calls())
+    assert run("expD", "--model", "claude-sonnet-5-5") == batch.EXIT_OK
+    assert len(env.fake.task_calls()) == n0 + 1
+    assert run("expD", "--model", "claude-sonnet-5-5") == batch.EXIT_OK
+    assert len(env.fake.task_calls()) == n0 + 1
+    names = sorted(p.name for p in env.out.glob("*_E01_run1.jsonl"))
+    assert names == ["baseline_haiku_default_E01_run1.jsonl", "expD_sonnet_default_E01_run1.jsonl"]
+
+
+def test_probe_file_name_for_sonnet_expD(env):
+    assert env.run("--experiment", "expD", "--tasks", "E01", "--runs", "1", "--yes", "--model", "claude-sonnet-5-5") == batch.EXIT_OK
+    assert (env.out / "probe_sonnet_expD-default_inv1_start.jsonl").exists()
+    assert len(env.fake.probe_calls()) == 2 and all(o.model == "claude-haiku-5-5" for _, o in env.fake.probe_calls())   # 탐침은 가장 싼 haiku로
