@@ -172,8 +172,8 @@
 ## 사용자 예측 기록 (실행 전, 원문 그대로)
 - Day 7 (시험 실행 전): (1) 어려운 과제 1개 비용 약 $0.01 (2) 어려운 과제 5개의 턴 수 합 45~55. 결과: 평균 $0.0028, 합 75.
 - Day 8 (베이스라인 전):
-  1. 전체 성공률: [A: 100%에 가까움(97~99%) / B: 120번 모두 성공 중 하나를 사용자가 지움]
-  2. 한 번이라도 실패하는 과제 수: [A: 1~2개 / B: 0개]
+  1. 전체 성공률은 전부 성공 → 맞음
+  2. 한 번이라도 실패하는 과제 1~2개 → 틀림(0개)
   3. error_max_turns에 걸리는 실행이 있을 것, 있다면 H02
   4. 검색 도구 선택률은 내장 Grep이 더 높을 것(search_text|Grep 선택률 50% 미만)
 
@@ -194,7 +194,7 @@
 - 한 일: 베이스라인 40개 x 3회 = 120회 실행(사용자 터미널, 호출 2번: 40회 + 80회), baseline_report로 정리. 천장 알림(전체 100%)에 사용자가 "예"로 답해 난이도별 결과 중심으로 해석한다.
 - 숫자: 120/120 통과(쉬움 45/45, 보통 51/51, 어려움 24/24), 정가 환산 $0.1973(실행당 평균 $0.0016), five_hour +0.01(40회), +0.02(80회)(둘 다 측정 한계 이하일 수 있음), seven_day +0.00, error_max_turns 0건, 도구 오류율 0/632.
 - 선택률: search_text 0/36(쌍 과제 N=12), Grep 사용 31/36. 일관성 (a) 49% (b) 42% (c) 40%(N=40, 과제당 3회). 턴 수 중앙값 4, 90번째 백분위 14, 최대 24, 모델 응답 수 중앙값 4, 최대 7.
-- 예측 대조(원문 기록은 위 '사용자 예측 기록'): 4번 Grep이 search_text보다 높음 = 맞음. 3번 error_max_turns(H02) = 틀림(0건). 2번 한 번이라도 실패하는 과제 = A(1~2개) 틀림, 0개(B). 1번 전체 성공률 = 전부 성공(B) 맞음. (1, 2번의 A/B 선택은 사용자가 따로 알려 주기로 함: 표기는 사용자 알림 후 확정)
+- 예측 대조(원문 기록은 위 '사용자 예측 기록'): 4번 Grep이 search_text보다 높음 = 맞음. 3번 error_max_turns(H02) = 틀림(0건). 2번 한 번이라도 실패하는 과제 1~2개 = 틀림(0개). 1번 전체 성공률은 전부 성공 = 맞음.
 - 관찰: num_turns 21~24인 성공 실행 3건(H01_run2, H04_run2, H04_run3)이 max_turns=20에서 error_max_turns 없이 끝났다. Day 8 준비 때 쓴 "max_turns 20 = 도구 호출 약 19번" 해석은 틀렸고, 한도는 모델 응답 수 기준으로 보인다(가설). docs/sdk_notes.md 정정 절, README, plan.md Day 13 줄 갱신.
 ## 실험 A 구현 — 단위 테스트 첫 실행 기록 (구현 전)
 - 테스트를 구현보다 먼저 작성: tests/test_tool_variants.py(13개 정도: default 동결 유지와 변형 모듈 분리, config 검증, 변형 3개의 이름/입력 스키마가 default와 같고 설명만 다름, 동작이 default와 동일, 길이 순서 short < default < long < long_directive, long에는 우선 사용 지시 단어 없음, long_directive = long + 문장 하나, 설명에 과제 프롬프트/정답/fixture 파일명/과제 ID/예시 값 미포함)와 tests/test_batch.py 4개(`--config-name`, 설정 이름 밑줄 변환, 베이스라인/expA/변형 간 이어하기 분리와 csv 분리, 탐침 파일명).
@@ -204,4 +204,9 @@
 - 구현: src/agent/tool_variants.py(변형 short, long, long_directive는 별도 모듈, default는 tools.py의 동결 정의 그대로), HarnessConfig가 모르는 tool_desc_version을 거부, build_server가 변형을 읽음, batch.py에 `--config-name`(`--config`와 같은 옵션; short, long, longDirective, long_directive도 받음)과 CONFIGS 3개 추가.
 - 구현 후 첫 실행: tests/test_tool_variants.py + tests/test_batch.py 60개 중 59개 통과, 1개 실패. 실패 = 예시 값 검사: 첫 예시 단어 'archive'가 fixture 안 텍스트에 이미 있었다(위치: 설명 문구 예시 값). 어떤 과제/fixture에도 없는 값('basalt', 'vault', 'vault/q7.txt')으로 바꿔 통과. 음성 대조 6가지(build_server가 변형 무시, long에 지시어 삽입, default 설명 한 글자 변경, 설정 이름 변환 제거, 지시 문장 중복, config 검증 제거) 모두 해당 테스트가 실패.
 - 확인: `freeze --verify` "동결 일치"(도구 정의 v1 해시와 config 기본값 해시 불변), 전체 테스트는 아래 최종 값 참고. MANIFEST 대상 파일은 바꾸지 않았다. 변형 설명 길이(글자 수)는 tests가 short < default < long < long_directive 순서를 확인한다.
-- 위치별 버그: 설명 문구 1(예시 단어가 fixture와 겹침), 러너 0, 테스트 코드 0.
+- 위치별 버그: 설명 문구 1(예시 단어가 fixture와 겹침), 러너 0, 테스트 코드 0.## 실험 A 비교표(exp_compare) — 단위 테스트 첫 실행 기록 (구현 전)
+- 테스트를 구현보다 먼저 작성: tests/test_exp_compare.py (표 형식 고정, 행마다 표본 크기 N/과제당 M회/총 건수, 30건 미만 경고, 성공률/error_max_turns, 선택률은 쌍 과제만, check_result는 전체 과제, 평균 num_turns/응답 수/호출 수/비용/입력 토큰(input+캐시 생성+캐시 읽기), 일관성이 report.py 값과 일치, 과제별 표, 반복별 선택률/범위, 정보 효과/지시 효과(pp), 판정 함수 큼/작음/확인 불가, 로그 읽기 규칙, 탐침/배치 비용, md/csv 출력, 읽기 전용).
+- 구현 전 실행: 모듈이 없어 수집 단계 ImportError(cannot import name 'exp_compare'). 아직 구현하지 않은 기능 때문이며 예상과 같다. 위치별 버그: 구현 전 상태, 테스트 코드 0.
+- 구현 후 첫 실행: 24개 중 첫 실행은 22개 통과, 2개 실패(예상 밖). 실패 1 = 과제별 표의 쌍 이름 `search_text|Grep`의 `|`가 마크다운 표 칸을 깨뜨림(구현 버그, 위치: 표 출력). 실패 2 = 효과 0, 범위 0 경계를 '확인 불가'로 처리(규칙 정의 문제: 효과가 0이면 큼이 아니므로 '작음'으로 정함, 위치: judge). 그 뒤 모든 표의 열 수 일치 테스트를 추가했더니 4절 판정 문구의 `|효과|`도 표를 깨뜨리고 있어 실패(구현 버그) -> '효과 크기'로 변경. 최종 24개 통과.
+- 음성 대조 7가지(우연 범위 min 사용, 입력 토큰에서 캐시 제외, check_result를 쌍 과제로 제한, 지시 효과 부호, 탐침 창 끝 무시, search_text 범위를 전체 과제로, 경고 기준 변경) 모두 테스트 실패. 전체 794개 통과, freeze --verify 동결 일치. 위치별 버그: 구현 2(표 깨짐 2곳), 규칙 정의 1, 테스트 코드 0.
+- 실행 결과(실험 A 360회 + baseline 120회, 읽기 전용): 정보 효과(long-default) search_text +13.9pp, file_stats +37.5pp(표본 24건 < 30 경고), 쌍 합산 +23.3pp. 지시 효과(long_directive-long) search_text +13.9pp, file_stats +0.0pp, 합산 +8.3pp. 반복 간 범위(합산 5.0pp, search_text 8.3pp)보다 모두 큼(file_stats 지시 효과는 0이라 작음). 성공률 default 100%, short 98%, long 95%, long_directive 98%(error_max_turns 0). 비용 합계 default $0.1973(40회 $0.0604 + 80회 $0.1369), short $0.1836, long $0.1559, long_directive $0.1547. five_hour 델타 short +0.04, long +0.01, long_directive +0.01.
