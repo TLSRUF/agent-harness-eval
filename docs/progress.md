@@ -223,3 +223,11 @@
 - 숫자(견고성): search_text를 한 번이라도 쓴 쌍 과제는 default 0/12, short 0/12, long 2/12, long_directive 5/12. file_stats는 6/8, 6/8, 8/8, 8/8. default 대비 줄어든 과제 0개.
 - 숫자(구현): 전체 테스트 821개 통과, freeze --verify 동결 일치, 음성 대조 9가지 모두 테스트 실패. 절차 위반 1건(exp_compare B 확장 코드를 테스트보다 먼저 넣음)은 위 기록에 적음.
 - 다음 할 일: 사용자가 expB 2배치(verify, verify_tool 각 120회)를 실행 -> `python -m src.eval.exp_compare --exp B`.
+## 실험 C, D 구현 — 단위 테스트 첫 실행 기록 (구현 전)
+- 테스트를 구현보다 먼저 작성. tests/test_batch.py 13개: `--max-turns`(3, 4, 5, 7만, 기본 20 불변, 파일 라벨 maxTurnsN, 도구 설명 default/프롬프트 v1 유지, 다른 변수와 충돌 거부, baseline/expA/expB/expC 이어하기 분리와 csv 분리, 탐침 파일명), `--model`(haiku/sonnet만, expD_sonnet_default 파일명, 설정 유지, 가드와 preflight가 sonnet에서도 같게 동작, 비용 상한을 다른 모델 로그에서 빌리지 않음). tests/test_exp_compare.py 17개: 실험 C(5열 비교표, error_max_turns 비율과 통과 건수 별도, 한계 판정 표 = 설정 max_turns x 응답 수별 success/error 건수와 판정 문구 4종) 11개, 실험 D(같은 (과제, run) 쌍만, 비교 범위 줄, 지표, 일관성, sonnet 탐침) 6개.
+- 구현 전 실행: test_batch.py 새 13개 실패(`--max-turns`, `--model` 미지원 argparse 오류), 기존 50개 통과. test_exp_compare.py 새 17개 실패(`--exp C/D` 심볼 없음), 기존 35개 통과. 아직 구현하지 않은 기능 때문이며 예상과 같다. 위치별 버그: 구현 전 상태, 테스트 코드 0.
+## 실험 C, D 구현 — 구현 후 결과 (한 일 / 숫자 / 다음)
+- 구현 후 첫 실행: tests/test_batch.py 새 13개 중 12개 통과, 1개 실패(테스트 자체 오류: 그 테스트가 `--no-probe`를 주면서 탐침 파일을 확인) -> 탐침 확인을 별도 테스트로 분리(탐침은 sonnet 실행에서도 haiku로 호출됨을 확인). tests/test_exp_compare.py 새 17개 통과했으나 A 기본 행 3개 실패(구현 버그: C 전용 두 행이 A, B 기본 행 목록에도 들어감, 행 순서도 코드 순서에 묶임) -> 행을 rows 인자 순서로 만들고 C 전용 행은 opt-in으로 수정. 테스트 코드 오류 1(D 표 검사가 한도 절 표까지 훑음).
+- 구현: `--max-turns`(3, 4, 5, 7만, 설정 이름 maxTurnsN, config 기본 20 불변), `--model`(claude-haiku-5-5/claude-sonnet-5-5만, 파일 이름 expD_sonnet_default), 변형 충돌(변수 둘 동시 변경) 거부, 비용 상한을 다른 모델 로그에서 빌리지 않음(sonnet은 "측정 전"), exp_compare `--exp C`(5열, error_max_turns 비율, 통과 건수 별도, 한계 판정 표와 판정 4종), `--exp D`(같은 (과제, run) 쌍만, 비교 범위 줄).
+- 숫자: 전체 테스트 852개 통과, freeze --verify 동결 일치, 음성 대조 11가지 모두 테스트 실패. 가드/preflight는 모델과 무관(허용 도구 목록 동일, sonnet 설정으로 preflight 호출 확인). 베이스라인 120건의 한계 판정 표: max_turns 20은 응답 수 2~7이라 확인 불가.
+- 다음 할 일: 사용자가 expB 2배치와 expC 4배치를 실행, 별도로 sonnet 시험 5회(H01, H02, H04, H05, H07 x 1회) 후 전체 실행 여부 결정.

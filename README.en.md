@@ -19,6 +19,7 @@ This harness blocks external connectors linked to the account from being loaded 
 - The `file_stats` tool counts lines with `str.splitlines()`, so lone CR, U+2028 and similar characters are also treated as line breaks; the evaluation fixtures contain no such characters.
 - Easy and medium tasks mostly have min_steps of 2 or less while all hard tasks have 3 or more, so the effect of step count cannot be separated from the effect of task type.
 - The reported num_turns equals tool calls + 1 (all 120 baseline runs), but the max_turns limit appears to be counted in model responses, not in num_turns (hypothesis: 3 successful runs had num_turns 21-24 under max_turns=20 without error_max_turns, with 5-7 model responses). Parallel calls within one response are counted per call in num_turns.
+- `file_stats` output does not contain the file name, so when several files are queried in parallel the pairing of calls and results can only be matched by order. In experiment A this pairing error was observed in 5 runs of H01 (the tool output itself was correct). Tool definitions v1 are frozen, so this was not fixed.
 - Experiment A changes the descriptions of all three tools (search_text, file_stats, check_result) at once, so the effect cannot be separated per tool, nor can the influence of one tool's description on the choice of another tool.
 
 ## Contributions

@@ -24,9 +24,10 @@ F_CUSTOM, F_BUILTIN = "mcp__t__file_stats", "Read"
 CHECK = "mcp__t__check_result"
 
 
-def make(d: Path, col, task, run, rounds=(), *, passed=True, subtype="success", cost=0.01, usage=(10, 100, 1000), ts=None, suffix=".jsonl"):
+def make(d: Path, col, task, run, rounds=(), *, passed=True, subtype="success", cost=0.01, usage=(10, 100, 1000), ts=None, suffix=".jsonl",
+         max_turns=20, final=True):
     """rounds: 응답 하나당 [도구 이름 또는 (이름, 입력 dict)] 목록. usage = (input, cache_creation, cache_read)."""
-    rows = [{"kind": "config", "task_id": task, "config": {"model": "claude-haiku-5-5", "max_turns": 20, "tool_desc_version": col}},
+    rows = [{"kind": "config", "task_id": task, "config": {"model": "claude-haiku-5-5", "max_turns": max_turns, "tool_desc_version": col}},
             {"kind": "message", "message": {"_type": "SystemMessage", "subtype": "init", "data": {"cwd": "C:/x", "tools": []}}}]
     n = 0
     for i, names in enumerate(rounds):
@@ -35,8 +36,9 @@ def make(d: Path, col, task, run, rounds=(), *, passed=True, subtype="success", 
             rows.append({"kind": "message", "message": {"_type": "AssistantMessage", "message_id": f"msg_{i}",
                                                         "content": [{"_type": "ToolUseBlock", "id": f"tu{n}", "name": name, "input": inp}]}})
             n += 1
-    rows.append({"kind": "message", "message": {"_type": "AssistantMessage", "message_id": "msg_final",
-                                                "content": [{"_type": "TextBlock", "text": "done"}]}})
+    if final:
+        rows.append({"kind": "message", "message": {"_type": "AssistantMessage", "message_id": "msg_final",
+                                                    "content": [{"_type": "TextBlock", "text": "done"}]}})
     summ = {"kind": "summary", "subtype": subtype, "is_error": subtype != "success", "num_turns": n + 1, "total_cost_usd": cost,
             "usage": {"input_tokens": usage[0], "cache_creation_input_tokens": usage[1], "cache_read_input_tokens": usage[2]},
             "exception": None, "graded": {"passed": passed, "failure_type": "pass" if passed else "wrong_value"}}
@@ -597,3 +599,272 @@ def test_b_tables_have_consistent_cell_counts(tmp_path):
         n = len(ln.strip().strip("|").split("|"))
         width = width or n
         assert n == width, ln
+
+
+# ---------------- 실험 C: max_turns 비교 (default=20, 3, 4, 5, 7) ----------------
+
+PREFIX.update({"3": "expC_haiku_maxTurns3", "4": "expC_haiku_maxTurns4", "5": "expC_haiku_maxTurns5", "7": "expC_haiku_maxTurns7"})
+COLS_C = ["default", "3", "4", "5", "7"]
+
+
+def fill_c(d, col, **kw):
+    mt = 20 if col == "default" else int(col)
+    for t in TASKS:
+        for r in (1, 2, 3):
+            make(d, col, t, r, max_turns=mt, **kw)
+
+
+def cells_c(text, label):
+    sec = text[text.index(ec.SECTION_TITLES_C[0]):text.index(ec.SECTION_TITLES_C[1])]
+    lines = [ln for ln in sec.splitlines() if ln.startswith(f"| {label}")]
+    assert len(lines) == 1, (label, lines)
+    return [c.strip() for c in lines[0].strip().strip("|").split("|")]
+
+
+def test_c_columns_titles_rows_are_fixed(tmp_path):
+    for c in COLS_C:
+        fill_c(tmp_path, c)
+    text = ec.build_from_dir_c(tmp_path)
+    assert ec.COLUMNS_C == COLS_C
+    assert text.startswith("# 실험 C 비교표 (exp_compare)\n")
+    assert ec.SECTION_TITLES_C == ["## 1. 설정 5개 비교", "## 2. 한계 판정: 설정 max_turns x 모델 응답 수", "## 3. 한도와 배치별 비용"]
+    assert "| 지표 | default | 3 | 4 | 5 | 7 | 표본 |" in text
+    sec = text[text.index(ec.SECTION_TITLES_C[0]):text.index(ec.SECTION_TITLES_C[1])]
+    rows = [ln.split("|")[1].strip() for ln in sec.splitlines() if ln.startswith("| ") and not ln.startswith("| 지표")]
+    assert rows == ["성공률", "error_max_turns 건수(비율)", "error_max_turns인데 채점 통과", "평균 모델 응답 수", "평균 num_turns", "실행당 평균 비용"]
+    for ln in sec.splitlines():
+        if ln.startswith("| ") and not ln.startswith("| 지표"):
+            assert re.search(r"N=\d+, 과제당 [\d~]+회.*총 \d+건", ln), ln
+
+
+def test_c_values_error_max_turns_rate_and_separate_pass_count_and_means(tmp_path):
+    for c in COLS_C:
+        fill_c(tmp_path, c)
+    total = 3 * len(TASKS)
+    # max_turns 3: 에러 3건(그중 1건은 채점 통과), 3건 중 응답 3개
+    make(tmp_path, "3", OTHER[0], 1, [[CHECK], [CHECK], [CHECK]], subtype="error_max_turns", passed=False, final=False, max_turns=3)
+    make(tmp_path, "3", OTHER[1], 1, [[CHECK], [CHECK], [CHECK]], subtype="error_max_turns", passed=True, final=False, max_turns=3)
+    make(tmp_path, "3", OTHER[2], 1, [[CHECK], [CHECK], [CHECK]], subtype="error_max_turns", passed=False, final=False, max_turns=3)
+    text = ec.build_from_dir_c(tmp_path)
+    assert cells_c(text, "error_max_turns 건수(비율)")[1] == f"0 (0%, 0/{total})"
+    assert cells_c(text, "error_max_turns 건수(비율)")[2] == f"3 ({100 * 3 / total:.0f}%, 3/{total})"
+    assert cells_c(text, "error_max_turns인데 채점 통과")[2] == "1/3"                 # 통과한 error_max_turns / error_max_turns 건수
+    assert cells_c(text, "error_max_turns인데 채점 통과")[1] == "0/0"
+    assert cells_c(text, "성공률")[2] == f"{100 * (total - 2) / total:.0f}% ({total - 2}/{total})"   # 채점 통과 기준: 에러 중 통과 1건은 성공에 포함
+    assert cells_c(text, "평균 num_turns")[1] == "1.0"
+    assert cells_c(text, "평균 모델 응답 수")[1] == "1.0"
+    assert cells_c(text, "실행당 평균 비용")[1] == "$0.0100"
+
+
+def test_c_small_sample_warning_and_missing_columns(tmp_path):
+    for t in OTHER[:2]:
+        for r in (1, 2, 3):
+            make(tmp_path, "default", t, r)
+            make(tmp_path, "3", t, r, max_turns=3)
+    text = ec.build_from_dir_c(tmp_path)
+    assert report.SMALL_SAMPLE_WARNING in cells_c(text, "성공률")[-1]
+    assert cells_c(text, "성공률")[3] == "n/a"
+
+
+def _limit_rows(text):
+    sec = text[text.index(ec.SECTION_TITLES_C[1]):text.index(ec.SECTION_TITLES_C[2])]
+    assert "| 설정 max_turns | 모델 응답 수 | success | error_max_turns | 합계 |" in sec
+    rows = {}
+    for ln in sec.splitlines():
+        c = [x.strip() for x in ln.strip().strip("|").split("|")]
+        if ln.startswith("| ") and c[0].isdigit() and len(c) == 5:
+            rows[(int(c[0]), int(c[1]))] = tuple(int(x) for x in c[2:])
+    return sec, rows
+
+
+def test_c_limit_table_groups_by_max_turns_and_response_count(tmp_path):
+    # max_turns 3: success(응답 2), success(응답 3) x2, error(응답 3) x1
+    make(tmp_path, "3", OTHER[0], 1, [[CHECK]], max_turns=3)
+    make(tmp_path, "3", OTHER[0], 2, [[CHECK], [CHECK]], max_turns=3)
+    make(tmp_path, "3", OTHER[0], 3, [[CHECK], [CHECK]], max_turns=3)
+    make(tmp_path, "3", OTHER[1], 1, [[CHECK]] * 3, subtype="error_max_turns", passed=False, final=False, max_turns=3)
+    # baseline(20): 응답 2, 4
+    make(tmp_path, "default", OTHER[2], 1, [[CHECK]])
+    make(tmp_path, "default", OTHER[2], 2, [[CHECK]] * 3)
+    text = ec.build_from_dir_c(tmp_path)
+    sec, rows = _limit_rows(text)
+    assert rows == {(3, 2): (1, 0, 1), (3, 3): (2, 1, 3), (20, 2): (1, 0, 1), (20, 4): (1, 0, 1)}
+    order = [k for k in re.findall(r"^\| (\d+) \| (\d+) \|", sec, re.M)]
+    assert order == sorted(order, key=lambda x: (int(x[0]), int(x[1])))
+
+
+def test_c_limit_verdict_supports_greater_than_rule_and_rejects_ge_when_success_at_equal(tmp_path):
+    make(tmp_path, "3", OTHER[0], 1, [[CHECK]] * 2, max_turns=3)                            # success, 응답 3 == 설정값
+    make(tmp_path, "3", OTHER[1], 1, [[CHECK]] * 3, subtype="error_max_turns", passed=False, final=False, max_turns=3)   # 에러, 응답 3
+    text = ec.build_from_dir_c(tmp_path)
+    line = next(ln for ln in text.splitlines() if ln.startswith("- max_turns 3:"))
+    assert "지지" in line and "> max_turns" in line and "≥" in line and "기각" in line
+    assert "한계에 걸린 실행 1건 중 응답 수가 설정값과 같은 실행 1건" in text
+
+
+def test_c_limit_verdict_partial_when_no_success_at_equal(tmp_path):
+    make(tmp_path, "4", OTHER[0], 1, [[CHECK]] * 4, subtype="error_max_turns", passed=False, final=False, max_turns=4)
+    make(tmp_path, "4", OTHER[0], 2, [[CHECK]], max_turns=4)                                # 응답 2 < 4
+    line = next(ln for ln in ec.build_from_dir_c(tmp_path).splitlines() if ln.startswith("- max_turns 4:"))
+    assert "부분 지지" in line and "확인 불가" in line
+
+
+def test_c_limit_verdict_contradiction_cases_are_undecidable(tmp_path):
+    make(tmp_path, "5", OTHER[0], 1, [[CHECK]] * 5, max_turns=5)                            # success인데 응답 6 > 5
+    make(tmp_path, "5", OTHER[1], 1, [[CHECK]] * 5, subtype="error_max_turns", passed=False, final=False, max_turns=5)
+    make(tmp_path, "7", OTHER[2], 1, [[CHECK]] * 2, subtype="error_max_turns", passed=False, final=False, max_turns=7)   # 에러인데 응답 2 != 7
+    text = ec.build_from_dir_c(tmp_path)
+    l5 = next(ln for ln in text.splitlines() if ln.startswith("- max_turns 5:"))
+    l7 = next(ln for ln in text.splitlines() if ln.startswith("- max_turns 7:"))
+    assert l5.startswith("- max_turns 5: 확인 불가") and "모순" in l5
+    assert l7.startswith("- max_turns 7: 확인 불가") and "모순" in l7
+
+
+def test_c_limit_verdict_when_no_run_hit_the_limit(tmp_path):
+    make(tmp_path, "default", OTHER[0], 1, [[CHECK]] * 3)
+    line = next(ln for ln in ec.build_from_dir_c(tmp_path).splitlines() if ln.startswith("- max_turns 20:"))
+    assert line.startswith("- max_turns 20: 확인 불가") and "한계에 걸린 실행 없음" in line
+
+
+def test_c_probes_collect_and_main_exp_c(tmp_path):
+    t0, t1 = "2026-11-12T03:00:00.000+00:00", "2026-11-12T03:30:00.000+00:00"
+    _probe(tmp_path, "expC-maxTurns3", "start", 0.40, 0.2, t0)
+    _probe(tmp_path, "expC-maxTurns3", "end", 0.41, 0.2, t1)
+    make(tmp_path, "3", OTHER[0], 1, cost=0.1, ts="2026-11-12T03:10:00.000+00:00", max_turns=3)
+    sec = ec.build_from_dir_c(tmp_path)
+    sec = sec[sec.index(ec.SECTION_TITLES_C[2]):]
+    line = next(ln for ln in sec.splitlines() if ln.startswith("| 3 |"))
+    assert "+0.01" in line and "| 1 | $0.1000 |" in line
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    fill_c(raw, "default")
+    args = ["--exp", "C", "--raw-dir", str(raw), "--out-md", str(tmp_path / "c.md"), "--out-csv", str(tmp_path / "c.csv")]
+    assert ec.main(args) == 1                                                         # baseline만 있으면 거부
+    make(raw, "3", OTHER[0], 1, max_turns=3)
+    assert ec.main(args) == 0
+    assert (tmp_path / "c.md").read_text(encoding="utf-8").startswith("# 실험 C 비교표")
+
+
+def test_c_collect_does_not_mix_other_experiments(tmp_path):
+    fill_c(tmp_path, "3")
+    fill_c(tmp_path, "4")
+    fill_all(tmp_path, "long")
+    (tmp_path / "expC_haiku_maxTurns3_summary.jsonl").write_text("{}", encoding="utf-8")
+    cols = ec.collect(tmp_path, ec.PREFIXES_C)
+    total = 3 * len(TASKS)
+    assert len(cols["3"]) == total and len(cols["4"]) == total and cols["5"] == [] and cols["default"] == []
+
+
+def test_c_tables_have_consistent_cell_counts(tmp_path):
+    for c in COLS_C:
+        fill_c(tmp_path, c)
+    width = None
+    for ln in ec.build_from_dir_c(tmp_path).splitlines():
+        if not ln.startswith("|"):
+            width = None
+            continue
+        n = len(ln.strip().strip("|").split("|"))
+        width = width or n
+        assert n == width, ln
+
+
+# ---------------- 실험 D: haiku baseline vs sonnet (같은 (과제, run) 쌍만) ----------------
+
+PREFIX.update({"haiku": "baseline_haiku_default", "sonnet": "expD_sonnet_default"})
+COLS_D = ["haiku", "sonnet"]
+
+
+def cells_d(text, label):
+    sec = text[text.index(ec.SECTION_TITLES_D[0]):text.index(ec.SECTION_TITLES_D[1])]
+    lines = [ln for ln in sec.splitlines() if ln.startswith(f"| {label}")]
+    assert len(lines) == 1, (label, lines)
+    return [c.strip() for c in lines[0].strip().strip("|").split("|")]
+
+
+def _d_setup(tmp_path):
+    for t in TASKS:
+        for r in (1, 2, 3):
+            make(tmp_path, "haiku", t, r, [[S_BUILTIN]] if t in SEARCH else [[F_BUILTIN]], cost=0.01)
+    hard = ["H01", "H02", "H04"]
+    for t in hard:
+        make(tmp_path, "sonnet", t, 1, [[S_CUSTOM], [F_CUSTOM]], cost=0.05, passed=t != "H02")
+
+
+def test_d_scope_line_lists_common_pairs_and_counts(tmp_path):
+    _d_setup(tmp_path)
+    text = ec.build_from_dir_d(tmp_path)
+    assert text.startswith("# 실험 D 비교표 (exp_compare)\n")
+    head = text[:text.index(ec.SECTION_TITLES_D[0])]
+    assert "비교 범위: 같은 (과제, run) 쌍 3건, 과제 3개(H01, H02, H04)" in head
+    assert f"haiku baseline 전체 {3 * len(TASKS)}건 중 3건" in head and "sonnet 전체 3건 중 3건" in head
+    assert ec.COLUMNS_D == COLS_D and "| 지표 | haiku | sonnet | 표본 |" in text
+    assert ec.SECTION_TITLES_D == ["## 1. haiku vs sonnet (같은 (과제, run) 쌍만)", "## 2. 한도와 배치별 비용"]
+
+
+def test_d_compares_only_pairs_present_in_both(tmp_path):
+    _d_setup(tmp_path)
+    make(tmp_path, "sonnet", "H05", 2, [[S_CUSTOM]], cost=0.07)                   # haiku에도 H05 run2가 있으므로 쌍이 된다
+    make(tmp_path, "sonnet", "E01", 4, [[S_CUSTOM]], cost=9.0)                    # haiku에 run4가 없다 -> 제외
+    text = ec.build_from_dir_d(tmp_path)
+    assert "같은 (과제, run) 쌍 4건" in text and "sonnet 전체 5건 중 4건" in text
+    assert cells_d(text, "실행당 평균 비용")[2] == f"${(0.05 * 3 + 0.07) / 4:.4f}"      # run4(9.0)는 평균에 안 들어간다
+    assert cells_d(text, "실행당 평균 비용")[1] == "$0.0100"
+    assert cells_d(text, "성공률")[1] == "100% (4/4)" and cells_d(text, "성공률")[2] == "75% (3/4)"
+
+
+def test_d_rows_selection_rates_means_and_sample_labels(tmp_path):
+    _d_setup(tmp_path)
+    text = ec.build_from_dir_d(tmp_path)
+    rows = [ln.split("|")[1].strip() for ln in text[text.index(ec.SECTION_TITLES_D[0]):text.index(ec.SECTION_TITLES_D[1])].splitlines()
+            if ln.startswith("| ") and not ln.startswith("| 지표")]
+    assert rows == ["성공률", "error_max_turns 건수", "평균 모델 응답 수", "평균 도구 호출 수", "실행당 평균 비용",
+                    "search_text 선택률", "Grep 사용률", "file_stats 선택률", "Read 사용률", "일관성 (a) 도구 순서", "일관성 (b) 핵심 인자"]
+    assert cells_d(text, "평균 도구 호출 수")[2] == "2.0" and cells_d(text, "평균 도구 호출 수")[1] == "1.0"
+    assert cells_d(text, "search_text 선택률")[1] == "n/a" and cells_d(text, "search_text 선택률")[2] == "n/a"     # H01, H02, H04는 search 쌍 과제가 아니다
+    assert cells_d(text, "file_stats 선택률")[2] == "100% (3/3)" and cells_d(text, "file_stats 선택률")[1] == "0% (0/3)"   # 세 과제 모두 file_stats 쌍
+    sec1 = text[text.index(ec.SECTION_TITLES_D[0]):text.index(ec.SECTION_TITLES_D[1])]
+    for ln in sec1.splitlines():
+        if ln.startswith("| ") and not ln.startswith("| 지표"):
+            assert re.search(r"N=\d+, 과제당 [\d~]+회.*총 \d+건", ln), ln
+    assert report.SMALL_SAMPLE_WARNING in cells_d(text, "성공률")[-1]
+    assert "n/a (0쌍)" in cells_d(text, "일관성 (a) 도구 순서")[2]                # 쌍마다 1회라 일관성 계산 불가
+
+
+def test_d_consistency_uses_only_pairs_with_two_or_more_runs(tmp_path):
+    for t in TASKS:
+        for r in (1, 2, 3):
+            make(tmp_path, "haiku", t, r, [[(S_CUSTOM, {"query": "a"})]])
+    for r in (1, 2):
+        make(tmp_path, "sonnet", "H01", r, [[(S_CUSTOM, {"query": "a"})]])
+    make(tmp_path, "sonnet", "H01", 3, [[(F_CUSTOM, {"path": "x"})]])
+    text = ec.build_from_dir_d(tmp_path)
+    assert "3쌍" in cells_d(text, "일관성 (a) 도구 순서")[2]
+    assert cells_d(text, "일관성 (a) 도구 순서")[1].startswith("100%")             # haiku도 같은 3개 쌍(H01 run1~3)만 비교
+
+
+def test_d_probes_use_sonnet_probe_names_and_main_exp_d(tmp_path):
+    t0, t1 = "2026-11-12T03:00:00.000+00:00", "2026-11-12T03:30:00.000+00:00"
+    rows = [{"kind": "config", "ts": t0, "task_id": "probe"}, {"kind": "summary", "ts": t0, "five_hour": 0.4, "seven_day": 0.2}]
+    (tmp_path / "probe_sonnet_expD-default_inv1_start.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    rows[1].update({"ts": t1, "five_hour": 0.47})
+    (tmp_path / "probe_sonnet_expD-default_inv1_end.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    make(tmp_path, "sonnet", "H01", 1, cost=0.5, ts="2026-11-12T03:10:00.000+00:00")
+    text = ec.build_from_dir_d(tmp_path)
+    line = next(ln for ln in text[text.index(ec.SECTION_TITLES_D[1]):].splitlines() if ln.startswith("| sonnet |"))
+    assert "+0.07" in line and "| 1 | $0.5000 |" in line
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    for t in TASKS:
+        make(raw, "haiku", t, 1)
+    args = ["--exp", "D", "--raw-dir", str(raw), "--out-md", str(tmp_path / "d.md"), "--out-csv", str(tmp_path / "d.csv")]
+    assert ec.main(args) == 1                                                         # sonnet 로그가 없으면 거부
+    make(raw, "sonnet", "H01", 1)
+    assert ec.main(args) == 0
+    assert (tmp_path / "d.md").read_text(encoding="utf-8").startswith("# 실험 D 비교표")
+
+
+def test_d_no_common_pairs_is_stated_not_crashed(tmp_path):
+    make(tmp_path, "haiku", "E01", 1)
+    make(tmp_path, "sonnet", "H01", 1)
+    text = ec.build_from_dir_d(tmp_path)
+    assert "같은 (과제, run) 쌍 0건" in text and "n/a" in cells_d(text, "성공률")[1]

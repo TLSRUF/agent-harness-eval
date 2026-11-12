@@ -19,7 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -27,7 +27,7 @@ from typing import Any, Callable
 from claude_agent_sdk import ClaudeAgentOptions, RateLimitEvent, ResultMessage, SystemMessage
 
 from src.agent import guard, runner_agent
-from src.agent.config import DEFAULT_MODEL, PROMPTS, VARIANT_PROMPTS, HarnessConfig
+from src.agent.config import COMPARE_MODEL, DEFAULT_MODEL, PROMPTS, VARIANT_PROMPTS, HarnessConfig
 from src.agent.ratelimit import extract_windows
 from src.agent.runner_agent import HARNESS_ENV, TrajectoryWriter, run_task, to_jsonable
 from src.agent.tools import SERVER_NAME
@@ -47,7 +47,14 @@ CONFIGS: dict[str, Callable[[], HarnessConfig]] = {
     # 실험 B는 시스템 프롬프트만 바꾼다(prompt_version). 도구 설명은 default
     "verify": lambda: HarnessConfig(prompt_version="verify"),
     "verifyTool": lambda: HarnessConfig(prompt_version="verify_tool"),
+    # 실험 C는 max_turns만 바꾼다. 기본값(20)은 config 기본값 그대로 두고 베이스라인이 맡는다
+    "maxTurns3": lambda: HarnessConfig(max_turns=3),
+    "maxTurns4": lambda: HarnessConfig(max_turns=4),
+    "maxTurns5": lambda: HarnessConfig(max_turns=5),
+    "maxTurns7": lambda: HarnessConfig(max_turns=7),
 }
+ALLOWED_MAX_TURNS = (3, 4, 5, 7)                          # 실험 C 후보(응답 수 분포 기준, plan.md)
+ALLOWED_MODELS = (DEFAULT_MODEL, COMPARE_MODEL)           # 실험 D: haiku(기본), sonnet
 CONFIG_ALIASES = {"long_directive": "longDirective", "verify_tool": "verifyTool"}  # 밑줄 이름은 파일명용 이름으로 바꿔 받는다
 RUN_FILE_RE = re.compile(r"^(?P<exp>[A-Za-z0-9]+)_(?P<model>[a-z]+)_(?P<cfg>[A-Za-z0-9]+)_(?P<task>[EMH]\d{2})_run(?P<n>\d+)\.jsonl$")
 NAME_RE = re.compile(r"^[A-Za-z0-9]+$")
@@ -120,6 +127,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                     help="설정 이름: default, short, long, longDirective(long_directive도 받음), verify, verifyTool(verify_tool도 받음). 실험 A는 도구 설명 변형, 실험 B는 프롬프트 변형")
     ap.add_argument("--prompt-version", dest="prompt_version", default=None,
                     help="시스템 프롬프트 버전: v1, verify, verify_tool. 실험 B. 설정 이름(파일 라벨)은 default/verify/verifyTool로 정해진다. --config-name과 같이 주면 같은 변형이어야 한다")
+    ap.add_argument("--max-turns", dest="max_turns", type=int, default=None,
+                    help="실험 C: 최대 턴 수(3, 4, 5, 7만). 설정 이름(파일 라벨)은 maxTurnsN. config 기본값 20은 바꾸지 않는다(베이스라인이 20)")
+    ap.add_argument("--model", dest="model", default=None,
+                    help="실험 D: claude-haiku-5-5(기본) 또는 claude-sonnet-5-5만. sonnet이면 파일 이름의 모델 자리가 sonnet이 된다. 다른 변수와 같이 바꿀 수 없다")
     ap.add_argument("--out-dir", default=str(runner_agent.RAW_DIR), help="jsonl과 스냅샷을 둘 폴더(기본 results/raw)")
     ap.add_argument("--results-dir", default=str(runner_agent.RESULTS_DIR), help="요약 파일을 둘 폴더(기본 results)")
     ap.add_argument("--probe", action=argparse.BooleanOptionalAction, default=True, help="시작/끝에 1턴 탐침 호출로 five_hour, seven_day 읽기(기본 켜짐)")
@@ -132,17 +143,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return ap.parse_args(argv)
 
 
-def resolve_prompt_version(a: argparse.Namespace) -> None:
-    """--prompt-version을 설정 이름(a.config)으로 바꾼다. 모르는 값이거나 --config-name과 다른 변형이면 ValueError."""
-    if not a.prompt_version:
-        return
-    pv = a.prompt_version
-    if pv not in PROMPTS and pv not in VARIANT_PROMPTS:
-        raise ValueError(f"알 수 없는 --prompt-version: {pv} (사용 가능: {['v1', *sorted(VARIANT_PROMPTS)]})")
-    label = "default" if pv == "v1" else CONFIG_ALIASES.get(pv, pv)
-    if a.config != "default" and a.config != label:
-        raise ValueError(f"--config-name {a.config}와 --prompt-version {pv}는 서로 다른 변형이다(한 번에 변수 하나만 바꾼다)")
-    a.config = label
+def resolve_variant(a: argparse.Namespace) -> None:
+    """--prompt-version, --max-turns, --config-name을 설정 이름(a.config) 하나로 합친다. --model은 다른 변수와 같이 바꿀 수 없다.
+
+    모르는 값이거나 서로 다른 변형을 동시에 주면 ValueError(한 번에 변수 하나만 바꾼다). 같은 변형을 여러 방법으로 주는 것은 허용한다.
+    """
+    requested: list[tuple[str, str]] = []
+    if a.prompt_version:
+        pv = a.prompt_version
+        if pv not in PROMPTS and pv not in VARIANT_PROMPTS:
+            raise ValueError(f"알 수 없는 --prompt-version: {pv} (사용 가능: {['v1', *sorted(VARIANT_PROMPTS)]})")
+        requested.append(("--prompt-version " + pv, "default" if pv == "v1" else CONFIG_ALIASES.get(pv, pv)))
+    if a.max_turns is not None:
+        if a.max_turns not in ALLOWED_MAX_TURNS:
+            raise ValueError(f"--max-turns는 {list(ALLOWED_MAX_TURNS)}만 허용한다(받은 값 {a.max_turns}; 기본 20은 베이스라인이 담당)")
+        requested.append((f"--max-turns {a.max_turns}", f"maxTurns{a.max_turns}"))
+    if a.config != "default":
+        requested.append(("--config-name " + a.config, a.config))
+    labels = {label for _, label in requested}
+    if len(labels) > 1:
+        raise ValueError("서로 다른 변형을 한 번에 바꿀 수 없다(한 번에 변수 하나만 바꾼다): " + ", ".join(name for name, _ in requested))
+    if a.model is not None:
+        if a.model not in ALLOWED_MODELS:
+            raise ValueError(f"--model은 {list(ALLOWED_MODELS)}만 허용한다(받은 값 {a.model})")
+        if a.model != DEFAULT_MODEL and any(label != "default" for label in labels):
+            raise ValueError("--model은 다른 변수(도구 설명, 프롬프트, max_turns)와 같이 바꿀 수 없다: " + ", ".join(name for name, _ in requested))
+    if labels:
+        a.config = next(iter(labels))
 
 
 def validate_names(a: argparse.Namespace) -> None:
@@ -262,12 +289,13 @@ def repro_info(deps: Deps, dirty_paths: list[str] | None) -> dict:
     }
 
 
-def measured_cost_bounds(out_dir: Path) -> dict[str, dict]:
-    """배치 규칙 이름의 로그에서 난이도(E/M/H)별 건당 비용 최댓값과 건수. 보관/탐침/옛 규칙 파일은 제외한다."""
+def measured_cost_bounds(out_dir: Path, model: str | None = None) -> dict[str, dict]:
+    """배치 규칙 이름의 로그에서 난이도(E/M/H)별 건당 비용 최댓값과 건수. 보관/탐침/옛 규칙 파일은 제외한다.
+    model(파일 이름의 모델 약칭)을 주면 그 모델의 로그만 쓴다(다른 모델의 측정값을 상한으로 빌리지 않기 위해)."""
     best: dict[str, dict] = {}
     for f in sorted(Path(out_dir).glob("*.jsonl")):
         m = RUN_FILE_RE.match(f.name)
-        if not m:
+        if not m or (model is not None and m["model"] != model):
             continue
         sums = [e for e in read_events(f) if e.get("kind") == "summary"]
         cost = sums[-1].get("total_cost_usd") if sums else None
@@ -577,7 +605,7 @@ def main(argv: list[str] | None = None, deps: Deps | None = None) -> int:
     a = parse_args(argv)
     a._argv = argv
     try:
-        resolve_prompt_version(a)
+        resolve_variant(a)
         validate_names(a)
         tasks = select_tasks(a, loader.load_all())
         threshold = resolve_threshold(a)
@@ -588,6 +616,8 @@ def main(argv: list[str] | None = None, deps: Deps | None = None) -> int:
         print(f"알 수 없는 설정 이름: {a.config} (사용 가능: {sorted(CONFIGS)})")
         return EXIT_REFUSED
     cfg = CONFIGS[a.config]()
+    if a.model is not None and a.model != cfg.model:
+        cfg = replace(cfg, model=a.model)                  # 실험 D: 모델만 바꾼다(HarnessConfig는 frozen이라 새로 만든다)
     model = cfg.model_short
     out_dir, results_dir = Path(a.out_dir), Path(a.results_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -621,7 +651,7 @@ def main(argv: list[str] | None = None, deps: Deps | None = None) -> int:
 
     # 4) 예상 호출 수와 비용 상한, 5) 확인
     selection, plan = _plan(out_dir, a, model, tasks)
-    bounds = measured_cost_bounds(out_dir)
+    bounds = measured_cost_bounds(out_dir, model)
     probes = 2 if a.probe else 0
     print(f"예상 실행: 과제 {len(tasks)}개 x 반복 {a.runs} = {len(selection)}회 (건너뜀 {plan['complete']}, 신규 실행 {plan['new'] + plan['redo']}회"
           f"{f' 중 끊긴/중단 실행 재실행 {plan['redo']}회' if plan['redo'] else ''})")
@@ -630,7 +660,10 @@ def main(argv: list[str] | None = None, deps: Deps | None = None) -> int:
     for d in sorted({t.id[0] for t in tasks}):
         b = bounds.get(d)
         print(f"  건당 비용 상한 {DIFFICULTY_LABEL[d]}: " + (f"측정 최대 ${b['max']:.4f} ({b['n']}건)" if b else "측정 전(추정값을 적지 않음)"))
-    print(f"  참고: 5턴 데모 과제는 건당 최대 ${DEMO_COST_BOUND} (2026-11-05 측정). 20턴까지 가는 과제에는 적용하지 않는다. 비용은 정가 환산이며 구독 한도 소모와는 별개다.")
+    if model == "haiku":
+        print(f"  참고: 5턴 데모 과제는 건당 최대 ${DEMO_COST_BOUND} (2026-11-05 측정). 20턴까지 가는 과제에는 적용하지 않는다. 비용은 정가 환산이며 구독 한도 소모와는 별개다.")
+    else:
+        print(f"  참고: {model}는 이 프로젝트에서 측정한 적이 없어 haiku 측정값을 상한으로 쓰지 않는다. 비용은 정가 환산이며 구독 한도 소모와는 별개다.")
     if not n_new:
         print("할 일이 없다(모두 끝남).")
     if not a.yes and _ask(deps, "시작하시겠습니까? (y/n): ") != "y":

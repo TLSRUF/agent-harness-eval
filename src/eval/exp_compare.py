@@ -31,6 +31,20 @@ COLUMNS_B = ["default", "verify", "verify_tool"]
 PREFIXES_B = {"default": "baseline_haiku_default", "verify": "expB_haiku_verify", "verify_tool": "expB_haiku_verifyTool"}
 PROBE_NAMES_B = {"default": "baseline-default", "verify": "expB-verify", "verify_tool": "expB-verifyTool"}
 SECTION_TITLES_B = ["## 1. 설정 3개 비교", "## 2. 한도와 배치별 비용"]
+# 실험 C(max_turns): 열 이름 = 설정 max_turns(default = baseline, max_turns 20)
+COLUMNS_C = ["default", "3", "4", "5", "7"]
+PREFIXES_C = {"default": "baseline_haiku_default", **{n: f"expC_haiku_maxTurns{n}" for n in ("3", "4", "5", "7")}}
+PROBE_NAMES_C = {"default": "baseline-default", **{n: f"expC-maxTurns{n}" for n in ("3", "4", "5", "7")}}
+SECTION_TITLES_C = ["## 1. 설정 5개 비교", "## 2. 한계 판정: 설정 max_turns x 모델 응답 수", "## 3. 한도와 배치별 비용"]
+ROWS_C = ["성공률", "error_max_turns 건수(비율)", "error_max_turns인데 채점 통과", "평균 모델 응답 수", "평균 num_turns", "실행당 평균 비용"]
+# 실험 D(모델 비교): haiku baseline vs sonnet, 같은 (과제, run) 쌍만
+COLUMNS_D = ["haiku", "sonnet"]
+PREFIXES_D = {"haiku": "baseline_haiku_default", "sonnet": "expD_sonnet_default"}
+PROBE_NAMES_D = {"haiku": "baseline-default", "sonnet": "expD-default"}
+PROBE_MODELS_D = {"haiku": "haiku", "sonnet": "sonnet"}
+SECTION_TITLES_D = ["## 1. haiku vs sonnet (같은 (과제, run) 쌍만)", "## 2. 한도와 배치별 비용"]
+ROWS_D = ["성공률", "error_max_turns 건수", "평균 모델 응답 수", "평균 도구 호출 수", "실행당 평균 비용", "search_text 선택률", "Grep 사용률",
+          "file_stats 선택률", "Read 사용률", "일관성 (a) 도구 순서", "일관성 (b) 핵심 인자"]
 ROWS_B = ["성공률", "error_max_turns 건수", "check_result 사용률", "평균 num_turns", "평균 모델 응답 수", "평균 도구 호출 수",
           "실행당 평균 비용", "일관성 (a) 도구 순서", "일관성 (b) 핵심 인자"]
 SECTION_TITLES = [
@@ -203,9 +217,10 @@ def _section1(cols, sels, out: _Out, columns=None, rows=None) -> list[str]:
     columns = columns or COLUMNS
     L = ["| 지표 | " + " | ".join(columns) + " | 표본 |", "|---|" + "---|" * len(columns) + "---|"]
     want = lambda label: rows is None or label in rows  # noqa: E731
+    built: dict[str, str] = {}
 
     def add(label, cells, labels, ks):
-        L.append(f"| {label} | " + " | ".join(cells[c] for c in columns) + f" | {_sample_cell(labels, ks, columns)} |")
+        built[label] = f"| {label} | " + " | ".join(cells[c] for c in columns) + f" | {_sample_cell(labels, ks, columns)} |"
 
     if want("성공률"):
         graded = {c: [r for r in cols[c] if r.run.passed is not None] for c in columns}
@@ -227,6 +242,26 @@ def _section1(cols, sels, out: _Out, columns=None, rows=None) -> list[str]:
             labels[c], ks[c] = report.sample_label(_per_task(rs)), len(rs)
             out.rec("error_max_turns 건수", c, len(mt), len(rs), len(mt) if rs else None, labels[c])
         add("error_max_turns 건수", cells, labels, ks)
+
+    if rows is not None and "error_max_turns 건수(비율)" in rows:                  # 실험 C 전용 행(다른 실험의 기본 행 목록에는 넣지 않는다)
+        cells, labels, ks = {}, {}, {}
+        for c in columns:
+            rs = cols[c]
+            k = sum(r.run.subtype == "error_max_turns" for r in rs)
+            cells[c] = f"{k} ({100 * k / len(rs):.0f}%, {k}/{len(rs)})" if rs else "n/a"
+            labels[c], ks[c] = report.sample_label(_per_task(rs)), len(rs)
+            out.rec("error_max_turns 건수(비율)", c, k, len(rs), _pct(k, len(rs)), labels[c])
+        add("error_max_turns 건수(비율)", cells, labels, ks)
+    if rows is not None and "error_max_turns인데 채점 통과" in rows:
+        cells, labels, ks = {}, {}, {}
+        for c in columns:
+            rs = cols[c]
+            mt = [r for r in rs if r.run.subtype == "error_max_turns"]
+            k = sum(bool(r.run.passed) for r in mt)
+            cells[c] = f"{k}/{len(mt)}" if rs else "n/a"
+            labels[c], ks[c] = report.sample_label(_per_task(rs)), len(rs)
+            out.rec("error_max_turns인데 채점 통과", c, k, len(mt), _pct(k, len(mt)), labels[c])
+        add("error_max_turns인데 채점 통과", cells, labels, ks)
 
     for name in ["search_text 선택률", "Grep 사용률", "file_stats 선택률", "Read 사용률", "check_result 사용률"]:
         if not want(name):
@@ -267,7 +302,8 @@ def _section1(cols, sels, out: _Out, columns=None, rows=None) -> list[str]:
             labels[c], ks[c] = report.sample_label(per), sum(per.values())
             out.rec(label, c, eq, pairs, _pct(eq, pairs), labels[c])
         add(label, cells, labels, ks)
-    return L
+    order = rows if rows is not None else list(built)
+    return L + [built[label] for label in order if label in built]
 
 
 def _section2(cols, tasks, out: _Out) -> list[str]:
@@ -350,7 +386,8 @@ def _read_probe(path: Path):
     return ts_cfg, ts_sum, five, seven
 
 
-def _section5(cols, raw_dir, out: _Out, columns=None, probe_names=None) -> list[str]:
+def _section5(cols, raw_dir, out: _Out, columns=None, probe_names=None, probe_models=None) -> list[str]:
+    probe_models = probe_models or {}
     columns = columns or COLUMNS
     probe_names = probe_names or PROBE_NAMES
     L = ["| 설정 | 호출 | five_hour 시작 | five_hour 종료 | five_hour 델타 | seven_day 시작 | seven_day 종료 | 실행 수 | 비용 합계 |",
@@ -359,13 +396,13 @@ def _section5(cols, raw_dir, out: _Out, columns=None, probe_names=None) -> list[
     for c in columns:
         recs = cols[c]
         starts = {}
-        for p in sorted(Path(raw_dir).glob(f"probe_haiku_{probe_names[c]}_inv*_start.jsonl")):
+        for p in sorted(Path(raw_dir).glob(f"probe_{probe_models.get(c, 'haiku')}_{probe_names[c]}_inv*_start.jsonl")):
             m = re.search(r"_inv(\d+)_start\.jsonl$", p.name)
             if m:
                 starts[int(m.group(1))] = p
         wins = []
         for n, sp in sorted(starts.items()):
-            ep = Path(raw_dir) / f"probe_haiku_{probe_names[c]}_inv{n}_end.jsonl"
+            ep = Path(raw_dir) / f"probe_{probe_models.get(c, 'haiku')}_{probe_names[c]}_inv{n}_end.jsonl"
             if not ep.is_file():
                 extra.append(f"- {c} 호출 {n}: 끝 탐침 없음(창을 정할 수 없어 제외)")
                 continue
@@ -478,6 +515,115 @@ def build_compare_b(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _O
     return "\n".join(lines)
 
 
+def limit_verdict(max_turns: int, success_resp: list[int], error_resp: list[int]) -> str:
+    """설정 max_turns별 한계 판정. 응답 수는 로그의 고유 message_id 개수. 규칙 후보: '응답 수가 max_turns를 넘으려 할 때 중단(>)' 대 '응답 수 >= max_turns면 중단(>=)'.
+
+    - 응답 수 > 설정값인 success나 응답 수 != 설정값인 error_max_turns가 있으면 응답 수 규칙과 모순이라 확인 불가.
+    - 한계에 걸린 실행이 없으면 확인 불가.
+    - 에러가 모두 응답 수 == 설정값이고 응답 수 == 설정값인 success가 있으면 > 규칙 지지, >= 규칙 기각.
+    - 같은 조건에서 응답 수 == 설정값인 success가 없으면 부분 지지(> 와 >= 구분은 확인 불가).
+    """
+    s_gt = sum(r > max_turns for r in success_resp)
+    s_eq = sum(r == max_turns for r in success_resp)
+    e_ne = sum(r != max_turns for r in error_resp)
+    if s_gt or e_ne:
+        return f"확인 불가(응답 수 규칙과 모순되는 실행이 있음: 응답 수 > 설정값인 success {s_gt}건, 응답 수 != 설정값인 error_max_turns {e_ne}건)"
+    if not error_resp:
+        top = max(success_resp, default=None)
+        return f"확인 불가(한계에 걸린 실행 없음; 응답 수 == 설정값인 success {s_eq}건, success 응답 수 최대 {top})"
+    if s_eq:
+        return (f"지지(가설 수준): error_max_turns {len(error_resp)}건이 모두 응답 수 == 설정값이고 응답 수 > 설정값인 success가 없다 -> "
+                f"응답 수가 max_turns를 넘으려 할 때 중단하는 규칙(> max_turns)과 맞다. 응답 수 == 설정값인 success {s_eq}건이 있어 "
+                f"'응답 수 ≥ max_turns면 중단'(≥ 규칙)은 기각")
+    return (f"부분 지지: error_max_turns {len(error_resp)}건이 모두 응답 수 == 설정값이고 응답 수 > 설정값인 success가 없다. "
+            f"응답 수 == 설정값인 success가 없어 > 와 ≥ 구분은 확인 불가")
+
+
+def _section_limit(cols, columns, out: _Out) -> list[str]:
+    groups: dict[tuple[int, int], list[int]] = defaultdict(lambda: [0, 0])
+    succ: dict[int, list[int]] = defaultdict(list)
+    errs: dict[int, list[int]] = defaultdict(list)
+    other = 0
+    for c in columns:
+        for r in cols[c]:
+            m = r.run.config.get("max_turns")
+            if m is None or r.run.subtype not in ("success", "error_max_turns"):
+                other += 1
+                continue
+            resp = r.item.responses
+            if r.run.subtype == "success":
+                groups[(m, resp)][0] += 1
+                succ[m].append(resp)
+            else:
+                groups[(m, resp)][1] += 1
+                errs[m].append(resp)
+    L = ["| 설정 max_turns | 모델 응답 수 | success | error_max_turns | 합계 |", "|---|---|---|---|---|"]
+    for (m, resp), (ok, er) in sorted(groups.items()):
+        L.append(f"| {m} | {resp} | {ok} | {er} | {ok + er} |")
+        out.rec("한계 판정 표(success)", f"max_turns{m}", ok, ok + er, None, f"응답 수 {resp}")
+        out.rec("한계 판정 표(error_max_turns)", f"max_turns{m}", er, ok + er, None, f"응답 수 {resp}")
+    L.append("")
+    for m in sorted({m for m, _ in groups}):
+        verdict = limit_verdict(m, succ[m], errs[m])
+        line = f"- max_turns {m}: {verdict}"
+        if errs[m]:
+            line += f". 한계에 걸린 실행 {len(errs[m])}건 중 응답 수가 설정값과 같은 실행 {sum(r == m for r in errs[m])}건"
+        L.append(line)
+        out.rec("한계 판정", f"max_turns{m}", None, None, None, verdict)
+    if other:
+        L.append(f"- success, error_max_turns가 아닌 종료(또는 max_turns 기록 없음) {other}건은 이 표에서 제외했다.")
+    L += ["- 응답 수 = assistant 메시지의 고유 message_id 개수(baseline_report와 같은 정의). 같은 응답 안의 병렬 도구 호출은 한 번으로 센다.",
+          "- error_max_turns는 num_turns가 설정값+1로 보고될 수 있어(관찰: Day 3) 응답 수로 비교한다. 이 표는 관찰이며 한계 판정 규칙(>, ≥)은 가설이다.",
+          "- 칸의 건수가 작아(대부분 30건 미만) 해석에 주의. 판정이 안 되면 확인 불가로 표시한다."]
+    return L
+
+
+def build_compare_c(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out | None = None) -> str:
+    """실험 C(max_turns) 비교표: default(20, baseline), 3, 4, 5, 7."""
+    tasks = tasks or {t.id: t for t in loader.load_all() if not t.is_todo}
+    out = out if out is not None else _Out()
+    sels = _selections(tasks)
+    head = ["# 실험 C 비교표 (exp_compare)", "",
+            "- 입력: " + ", ".join(f"{c} {len(cols[c])}건" for c in COLUMNS_C) + ". 최종 실행 로그만 읽는다(.partial, _final 제외). 읽기 전용, 모델 호출 없음.",
+            "- 열 이름 = 설정 max_turns(default = baseline의 max_turns 20). 도구 설명 default, 프롬프트 v1, 모델 haiku로 같다.",
+            "- 성공률은 채점 통과 기준이라 error_max_turns인데 통과한 실행도 포함한다(그 건수는 별도 행)."]
+    bodies = [_section1(cols, sels, out, COLUMNS_C, ROWS_C), _section_limit(cols, COLUMNS_C, out),
+              _section5(cols, raw_dir, out, COLUMNS_C, PROBE_NAMES_C)]
+    lines = head + [""]
+    for title, body in zip(SECTION_TITLES_C, bodies):
+        lines += [title, ""] + body + [""]
+    return "\n".join(lines)
+
+
+def build_from_dir_c(raw_dir, tasks=None) -> str:
+    return build_compare_c(collect(raw_dir, PREFIXES_C), raw_dir, tasks)
+
+
+def build_compare_d(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out | None = None) -> str:
+    """실험 D(모델 비교): 같은 (과제, run) 쌍에 대해서만 haiku baseline과 sonnet을 비교한다. 비교 범위를 맨 위에 적는다."""
+    tasks = tasks or {t.id: t for t in loader.load_all() if not t.is_todo}
+    out = out if out is not None else _Out()
+    sels = _selections(tasks)
+    common = {(r.task, r.n) for r in cols["haiku"]} & {(r.task, r.n) for r in cols["sonnet"]}
+    sub = {c: [r for r in cols[c] if (r.task, r.n) in common] for c in COLUMNS_D}
+    ids = sorted({t for t, _ in common})
+    head = ["# 실험 D 비교표 (exp_compare)", "",
+            f"- 비교 범위: 같은 (과제, run) 쌍 {len(common)}건, 과제 {len(ids)}개({', '.join(ids)}). "
+            f"haiku baseline 전체 {len(cols['haiku'])}건 중 {len(common)}건, sonnet 전체 {len(cols['sonnet'])}건 중 {len(common)}건을 비교한다(나머지는 제외).",
+            "- 입력: 최종 실행 로그만 읽는다(.partial, _final 제외). 읽기 전용, 모델 호출 없음. 도구 설명 default, 프롬프트 v1, max_turns 20으로 같다.",
+            "- 일관성은 같은 과제의 반복이 2회 이상인 쌍에서만 계산되어, 과제당 1회 시험이면 n/a다."]
+    out.rec("비교 범위(쌍 수)", "haiku-sonnet", len(common), None, len(common), ", ".join(ids))
+    bodies = [_section1(sub, sels, out, COLUMNS_D, ROWS_D), _section5(cols, raw_dir, out, COLUMNS_D, PROBE_NAMES_D, PROBE_MODELS_D)]
+    lines = head + [""]
+    for title, body in zip(SECTION_TITLES_D, bodies):
+        lines += [title, ""] + body + [""]
+    return "\n".join(lines)
+
+
+def build_from_dir_d(raw_dir, tasks=None) -> str:
+    return build_compare_d(collect(raw_dir, PREFIXES_D), raw_dir, tasks)
+
+
 def build_from_dir_b(raw_dir, tasks=None) -> str:
     return build_compare_b(collect(raw_dir, PREFIXES_B), raw_dir, tasks)
 
@@ -488,7 +634,8 @@ def build_from_dir(raw_dir, tasks=None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="실험 비교표(읽기 전용, 모델 호출 없음)")
-    ap.add_argument("--exp", choices=["A", "B"], default="A", help="A: default/short/long/long_directive, B: default/verify/verify_tool")
+    ap.add_argument("--exp", choices=["A", "B", "C", "D"], default="A",
+                    help="A: default/short/long/long_directive, B: default/verify/verify_tool, C: default/max_turns 3,4,5,7, D: haiku vs sonnet")
     ap.add_argument("--raw-dir", default="results/raw")
     ap.add_argument("--out-md", default=None)
     ap.add_argument("--out-csv", default=None)
@@ -497,12 +644,15 @@ def main(argv: list[str] | None = None) -> int:
         a.out_md = f"results/exp{a.exp}_haiku_compare_summary_inv1.md"
     if a.out_csv is None:
         a.out_csv = f"results/exp{a.exp}_haiku_compare_runs.csv"
-    cols = collect(a.raw_dir, PREFIXES if a.exp == "A" else PREFIXES_B)
-    if not any(v for k, v in cols.items() if k != "default" or a.exp == "A"):
-        print("읽을 로그가 없다" if a.exp == "A" else "실험 B 로그가 없다(baseline만 있거나 비어 있음)", file=sys.stderr)
+    prefixes = {"A": PREFIXES, "B": PREFIXES_B, "C": PREFIXES_C, "D": PREFIXES_D}[a.exp]
+    builder = {"A": build_compare, "B": build_compare_b, "C": build_compare_c, "D": build_compare_d}[a.exp]
+    cols = collect(a.raw_dir, prefixes)
+    baseline_keys = {"A": set(), "B": {"default"}, "C": {"default"}, "D": {"haiku"}}[a.exp]
+    if not any(v for k, v in cols.items() if k not in baseline_keys):
+        print("읽을 로그가 없다" if a.exp == "A" else f"실험 {a.exp} 로그가 없다(baseline만 있거나 비어 있음)", file=sys.stderr)
         return 1
     out = _Out()
-    text = (build_compare if a.exp == "A" else build_compare_b)(cols, a.raw_dir, None, out)
+    text = builder(cols, a.raw_dir, None, out)
     Path(a.out_md).write_text(text, encoding="utf-8")
     with open(a.out_csv, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["metric", "config", "task", "numerator", "denominator", "value", "sample"])
