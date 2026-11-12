@@ -74,7 +74,8 @@ def test_columns_headings_and_row_labels_are_fixed(tmp_path):
     assert ec.COLUMNS == COLS
     assert text.startswith("# 실험 A 비교표 (exp_compare)\n")
     heads = ["## 1. 설정 4개 비교", "## 2. 과제별 선택률 (과제 x 설정, 3회 중 커스텀 도구를 쓴 횟수)",
-             "## 3. 반복별 선택률과 우연 범위", "## 4. 정보 효과와 지시 효과 (선택률 차이, 퍼센트 포인트)", "## 5. 한도와 배치별 비용"]
+             "## 3. 반복별 선택률과 우연 범위", "## 4. 정보 효과와 지시 효과 (선택률 차이, 퍼센트 포인트)", "## 5. 한도와 배치별 비용",
+             "## 6. 견고성: 과제 단위 사용 과제 수와 선택 변화"]
     assert ec.SECTION_TITLES == heads
     pos = [text.index(h) for h in heads]
     assert pos == sorted(pos)
@@ -409,3 +410,190 @@ def test_every_markdown_table_row_has_the_same_cell_count_as_its_header(tmp_path
         assert n == width, ln
         checked += 1
     assert checked > 60
+
+
+# ---------------- 6. 견고성 ----------------
+
+def _sec6(text):
+    return text[text.index(ec.SECTION_TITLES[5]):]
+
+
+def _setup_robust(tmp_path):
+    for c in COLS:
+        fill_all(tmp_path, c)
+    # default: SEARCH[2]만 2/3 사용
+    for r in (1, 2):
+        make(tmp_path, "default", SEARCH[2], r, [[S_CUSTOM]])
+    # long: SEARCH[0] 3/3, SEARCH[1] 1/3 (SEARCH[2]는 0/3으로 줄어듦), FILE[0] 3/3
+    for r in (1, 2, 3):
+        make(tmp_path, "long", SEARCH[0], r, [[S_CUSTOM]])
+        make(tmp_path, "long", FILE[0], r, [[F_CUSTOM]])
+    make(tmp_path, "long", SEARCH[1], 1, [[S_CUSTOM]])
+    # long_directive: SEARCH[0] 3/3, SEARCH[2] 3/3, FILE[0] 3/3, FILE[1] 2/3
+    for r in (1, 2, 3):
+        make(tmp_path, "long_directive", SEARCH[0], r, [[S_CUSTOM]])
+        make(tmp_path, "long_directive", SEARCH[2], r, [[S_CUSTOM]])
+        make(tmp_path, "long_directive", FILE[0], r, [[F_CUSTOM]])
+    for r in (1, 2):
+        make(tmp_path, "long_directive", FILE[1], r, [[F_CUSTOM]])
+
+
+def test_robustness_counts_tasks_that_used_the_custom_tool_at_least_once(tmp_path):
+    _setup_robust(tmp_path)
+    sec = _sec6(build(tmp_path))
+    assert "| 지표 | default | short | long | long_directive | 표본 |" in sec
+    ns, nf = len(SEARCH), len(FILE)
+    row = lambda label: [c.strip() for c in next(ln for ln in sec.splitlines() if ln.startswith(f"| {label}")).strip().strip("|").split("|")]
+    s = row("search_text 쌍 과제 중 한 번이라도 쓴 과제 수")
+    assert s[1:5] == [f"1/{ns} (3회 모두 0)", f"0/{ns} (3회 모두 0)", f"2/{ns} (3회 모두 1)", f"2/{ns} (3회 모두 2)"]
+    f = row("file_stats 쌍 과제 중 한 번이라도 쓴 과제 수")
+    assert f[1:5] == [f"0/{nf} (3회 모두 0)", f"0/{nf} (3회 모두 0)", f"1/{nf} (3회 모두 1)", f"2/{nf} (3회 모두 1)"]
+    assert f"N={ns}, 과제당 3회" in s[5] and f"N={nf}, 과제당 3회" in f[5]
+    assert report.SMALL_SAMPLE_WARNING in s[5] and report.SMALL_SAMPLE_WARNING in f[5]     # 과제 수가 30 미만
+
+
+def test_robustness_lists_tasks_with_more_and_less_custom_use_than_default(tmp_path):
+    _setup_robust(tmp_path)
+    sec = _sec6(build(tmp_path))
+    line = lambda prefix: next(ln for ln in sec.splitlines() if ln.startswith(prefix))
+    up = line("- long vs default 늘어난 과제")
+    assert f"{SEARCH[0]}(0/3→3/3)" in up and f"{SEARCH[1]}(0/3→1/3)" in up and f"{FILE[0]}(0/3→3/3)" in up and "3개" in up
+    down = line("- long vs default 줄어든 과제")
+    assert f"{SEARCH[2]}(2/3→0/3)" in down and "1개" in down
+    up2 = line("- long_directive vs default 늘어난 과제")
+    assert f"{SEARCH[2]}(2/3→3/3)" in up2 and f"{FILE[1]}(0/3→2/3)" in up2
+    assert line("- long_directive vs default 줄어든 과제").endswith("0개: 없음")
+    assert "- long vs default 같은 과제" in sec                                            # 변화 없는 과제 수도 센다
+
+
+def test_robustness_unchanged_count_and_per_task_noise_note(tmp_path):
+    _setup_robust(tmp_path)
+    sec = _sec6(build(tmp_path))
+    total = len(SEARCH) + len(FILE)
+    line = next(ln for ln in sec.splitlines() if ln.startswith("- long vs default 같은 과제"))
+    assert f"{total - 4}개" in line                                                        # 늘어난 3 + 줄어든 1 = 4개가 아닌 나머지
+    assert "한 과제 3회" in sec or "3회 중" in sec                                         # 칸 단위 표본이 3회임을 알린다
+
+
+def test_robustness_with_missing_config_does_not_crash(tmp_path):
+    fill_all(tmp_path, "default")
+    sec = _sec6(build(tmp_path))
+    assert "n/a" in sec
+
+
+# ---------------- 실험 B 비교 (default, verify, verify_tool) ----------------
+
+PREFIX_B = {"default": "baseline_haiku_default", "verify": "expB_haiku_verify", "verify_tool": "expB_haiku_verifyTool"}
+COLS_B = ["default", "verify", "verify_tool"]
+
+
+def make_b(d, col, task, run, rounds=(), **kw):
+    PREFIX[col] = PREFIX_B[col]                       # make()가 쓰는 접두 표에 B 설정을 등록
+    return make(d, col, task, run, rounds, **kw)
+
+
+def fill_b(d, col, **kw):
+    for t in TASKS:
+        for r in (1, 2, 3):
+            make_b(d, col, t, r, **kw)
+
+
+def cells_b(text, label):
+    sec = text[text.index(ec.SECTION_TITLES_B[0]):text.index(ec.SECTION_TITLES_B[1])]
+    lines = [ln for ln in sec.splitlines() if ln.startswith(f"| {label}")]
+    assert len(lines) == 1, (label, lines)
+    return [c.strip() for c in lines[0].strip().strip("|").split("|")]
+
+
+def test_b_columns_titles_rows_are_fixed(tmp_path):
+    for c in COLS_B:
+        fill_b(tmp_path, c)
+    text = ec.build_from_dir_b(tmp_path)
+    assert ec.COLUMNS_B == COLS_B
+    assert text.startswith("# 실험 B 비교표 (exp_compare)\n")
+    assert ec.SECTION_TITLES_B == ["## 1. 설정 3개 비교", "## 2. 한도와 배치별 비용"]
+    assert "| 지표 | default | verify | verify_tool | 표본 |" in text
+    sec = text[text.index(ec.SECTION_TITLES_B[0]):text.index(ec.SECTION_TITLES_B[1])]
+    rows = [ln.split("|")[1].strip() for ln in sec.splitlines() if ln.startswith("| ") and not ln.startswith("| 지표")]
+    assert rows == ["성공률", "error_max_turns 건수", "check_result 사용률", "평균 num_turns", "평균 모델 응답 수", "평균 도구 호출 수",
+                    "실행당 평균 비용", "일관성 (a) 도구 순서", "일관성 (b) 핵심 인자"]
+    for ln in sec.splitlines():
+        if ln.startswith("| ") and not ln.startswith("| 지표"):
+            assert re.search(r"N=\d+, 과제당 [\d~]+회.*총 \d+건", ln), ln
+
+
+def test_b_values_success_max_turns_check_result_means_and_consistency(tmp_path):
+    for c in COLS_B:
+        fill_b(tmp_path, c)
+    make_b(tmp_path, "verify", OTHER[0], 1, [[CHECK], [CHECK]], passed=False, cost=0.03)
+    make_b(tmp_path, "verify", OTHER[1], 1, [[CHECK]], subtype="error_max_turns", passed=True)
+    for r in (1, 2, 3):
+        make_b(tmp_path, "verify_tool", OTHER[2], r, [[(CHECK, {"path": "x"})]])
+    text = ec.build_from_dir_b(tmp_path)
+    total = 3 * len(TASKS)
+    assert cells_b(text, "성공률")[1] == f"100% ({total}/{total})"
+    assert cells_b(text, "성공률")[2] == f"99% ({total - 1}/{total})"
+    assert cells_b(text, "error_max_turns 건수")[2] == "1 (통과 1)"
+    assert cells_b(text, "check_result 사용률")[2] == f"{100 * 2 / total:.0f}% (2/{total})"
+    assert cells_b(text, "check_result 사용률")[3] == f"{100 * 3 / total:.0f}% (3/{total})"
+    assert cells_b(text, "평균 num_turns")[1] == "1.0"
+    assert cells_b(text, "실행당 평균 비용")[2].startswith("$0.01")
+    assert "쌍" in cells_b(text, "일관성 (a) 도구 순서")[1]
+
+
+def test_b_warns_on_small_samples_and_missing_configs_are_na(tmp_path):
+    for t in OTHER[:2]:
+        for r in (1, 2, 3):
+            make_b(tmp_path, "default", t, r)
+            make_b(tmp_path, "verify", t, r)
+    text = ec.build_from_dir_b(tmp_path)
+    assert report.SMALL_SAMPLE_WARNING in cells_b(text, "성공률")[-1]
+    assert cells_b(text, "성공률")[3] == "n/a"
+
+
+def test_b_collect_does_not_mix_verify_with_verify_tool_or_other_experiments(tmp_path):
+    fill_b(tmp_path, "verify")
+    fill_b(tmp_path, "verify_tool")
+    fill_all(tmp_path, "long")
+    (tmp_path / "expB_haiku_verify_summary.jsonl").write_text("{}", encoding="utf-8")
+    make_b(tmp_path, "verify", OTHER[0], 1, suffix=".jsonl.partial1")
+    cols = ec.collect(tmp_path, ec.PREFIXES_B)
+    total = 3 * len(TASKS)
+    assert len(cols["verify"]) == total and len(cols["verify_tool"]) == total and cols["default"] == []
+    assert not any("verifyTool" in r.item.run.path for r in cols["verify"])
+
+
+def test_b_probes_use_expB_names(tmp_path):
+    t0, t1 = "2026-11-12T03:00:00.000+00:00", "2026-11-12T03:30:00.000+00:00"
+    _probe(tmp_path, "expB-verifyTool", "start", 0.40, 0.2, t0)
+    _probe(tmp_path, "expB-verifyTool", "end", 0.45, 0.2, t1)
+    make_b(tmp_path, "verify_tool", OTHER[0], 1, cost=0.1, ts="2026-11-12T03:10:00.000+00:00")
+    text = ec.build_from_dir_b(tmp_path)
+    line = next(ln for ln in text[text.index(ec.SECTION_TITLES_B[1]):].splitlines() if ln.startswith("| verify_tool |"))
+    assert "+0.05" in line and "| 1 | $0.1000 |" in line
+
+
+def test_main_exp_b_writes_files_and_refuses_when_no_b_logs(tmp_path):
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    fill_all(raw, "default")                                   # baseline만 있다
+    assert ec.main(["--exp", "B", "--raw-dir", str(raw), "--out-md", str(tmp_path / "b.md"), "--out-csv", str(tmp_path / "b.csv")]) == 1
+    fill_b(raw, "verify")
+    assert ec.main(["--exp", "B", "--raw-dir", str(raw), "--out-md", str(tmp_path / "b.md"), "--out-csv", str(tmp_path / "b.csv")]) == 0
+    assert (tmp_path / "b.md").read_text(encoding="utf-8").startswith("# 실험 B 비교표")
+    got = {(r["metric"], r["config"]) for r in csv.DictReader((tmp_path / "b.csv").open(encoding="utf-8"))}
+    assert ("성공률", "verify") in got and ("check_result 사용률", "default") in got
+
+
+def test_b_tables_have_consistent_cell_counts(tmp_path):
+    for c in COLS_B:
+        fill_b(tmp_path, c)
+    text = ec.build_from_dir_b(tmp_path)
+    width = None
+    for ln in text.splitlines():
+        if not ln.startswith("|"):
+            width = None
+            continue
+        n = len(ln.strip().strip("|").split("|"))
+        width = width or n
+        assert n == width, ln

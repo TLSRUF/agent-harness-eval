@@ -27,7 +27,7 @@ from typing import Any, Callable
 from claude_agent_sdk import ClaudeAgentOptions, RateLimitEvent, ResultMessage, SystemMessage
 
 from src.agent import guard, runner_agent
-from src.agent.config import DEFAULT_MODEL, HarnessConfig
+from src.agent.config import DEFAULT_MODEL, PROMPTS, VARIANT_PROMPTS, HarnessConfig
 from src.agent.ratelimit import extract_windows
 from src.agent.runner_agent import HARNESS_ENV, TrajectoryWriter, run_task, to_jsonable
 from src.agent.tools import SERVER_NAME
@@ -44,8 +44,11 @@ CONFIGS: dict[str, Callable[[], HarnessConfig]] = {
     "short": lambda: HarnessConfig(tool_desc_version="short"),
     "long": lambda: HarnessConfig(tool_desc_version="long"),
     "longDirective": lambda: HarnessConfig(tool_desc_version="long_directive"),
+    # 실험 B는 시스템 프롬프트만 바꾼다(prompt_version). 도구 설명은 default
+    "verify": lambda: HarnessConfig(prompt_version="verify"),
+    "verifyTool": lambda: HarnessConfig(prompt_version="verify_tool"),
 }
-CONFIG_ALIASES = {"long_directive": "longDirective"}  # 밑줄 이름은 파일명용 이름으로 바꿔 받는다
+CONFIG_ALIASES = {"long_directive": "longDirective", "verify_tool": "verifyTool"}  # 밑줄 이름은 파일명용 이름으로 바꿔 받는다
 RUN_FILE_RE = re.compile(r"^(?P<exp>[A-Za-z0-9]+)_(?P<model>[a-z]+)_(?P<cfg>[A-Za-z0-9]+)_(?P<task>[EMH]\d{2})_run(?P<n>\d+)\.jsonl$")
 NAME_RE = re.compile(r"^[A-Za-z0-9]+$")
 LIMIT_RE = re.compile(r"rate.?limit|usage limit|limit (reached|exceeded)|hit your .{0,20}limit|quota|overloaded|\b429\b|\b529\b|credit balance", re.I)
@@ -114,7 +117,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     sel.add_argument("--all", action="store_true", help="40개 전체")
     ap.add_argument("--runs", type=int, default=2, help="과제당 반복 횟수(기본 2)")
     ap.add_argument("--config", "--config-name", dest="config", default="default", type=lambda s: CONFIG_ALIASES.get(s, s),
-                    help="설정 이름: default, short, long, longDirective(long_directive도 받음). 실험 A는 도구 설명 변형")
+                    help="설정 이름: default, short, long, longDirective(long_directive도 받음), verify, verifyTool(verify_tool도 받음). 실험 A는 도구 설명 변형, 실험 B는 프롬프트 변형")
+    ap.add_argument("--prompt-version", dest="prompt_version", default=None,
+                    help="시스템 프롬프트 버전: v1, verify, verify_tool. 실험 B. 설정 이름(파일 라벨)은 default/verify/verifyTool로 정해진다. --config-name과 같이 주면 같은 변형이어야 한다")
     ap.add_argument("--out-dir", default=str(runner_agent.RAW_DIR), help="jsonl과 스냅샷을 둘 폴더(기본 results/raw)")
     ap.add_argument("--results-dir", default=str(runner_agent.RESULTS_DIR), help="요약 파일을 둘 폴더(기본 results)")
     ap.add_argument("--probe", action=argparse.BooleanOptionalAction, default=True, help="시작/끝에 1턴 탐침 호출로 five_hour, seven_day 읽기(기본 켜짐)")
@@ -125,6 +130,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--yes", action="store_true", help="비용 확인(y/n)을 건너뜀")
     ap.add_argument("--allow-dirty", action="store_true", help="코드/데이터 변경 경고의 y/n 확인을 건너뜀")
     return ap.parse_args(argv)
+
+
+def resolve_prompt_version(a: argparse.Namespace) -> None:
+    """--prompt-version을 설정 이름(a.config)으로 바꾼다. 모르는 값이거나 --config-name과 다른 변형이면 ValueError."""
+    if not a.prompt_version:
+        return
+    pv = a.prompt_version
+    if pv not in PROMPTS and pv not in VARIANT_PROMPTS:
+        raise ValueError(f"알 수 없는 --prompt-version: {pv} (사용 가능: {['v1', *sorted(VARIANT_PROMPTS)]})")
+    label = "default" if pv == "v1" else CONFIG_ALIASES.get(pv, pv)
+    if a.config != "default" and a.config != label:
+        raise ValueError(f"--config-name {a.config}와 --prompt-version {pv}는 서로 다른 변형이다(한 번에 변수 하나만 바꾼다)")
+    a.config = label
 
 
 def validate_names(a: argparse.Namespace) -> None:
@@ -559,6 +577,7 @@ def main(argv: list[str] | None = None, deps: Deps | None = None) -> int:
     a = parse_args(argv)
     a._argv = argv
     try:
+        resolve_prompt_version(a)
         validate_names(a)
         tasks = select_tasks(a, loader.load_all())
         threshold = resolve_threshold(a)

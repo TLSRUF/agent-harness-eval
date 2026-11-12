@@ -26,12 +26,20 @@ COLUMNS = ["default", "short", "long", "long_directive"]
 PREFIXES = {"default": "baseline_haiku_default", "short": "expA_haiku_short", "long": "expA_haiku_long",
             "long_directive": "expA_haiku_longDirective"}
 PROBE_NAMES = {"default": "baseline-default", "short": "expA-short", "long": "expA-long", "long_directive": "expA-longDirective"}
+# 실험 B(검증 지시): 설정 이름(로그의 prompt_version 값)은 verify_tool이지만 파일/탐침 이름에는 밑줄을 쓰지 않아 verifyTool로 쓴다
+COLUMNS_B = ["default", "verify", "verify_tool"]
+PREFIXES_B = {"default": "baseline_haiku_default", "verify": "expB_haiku_verify", "verify_tool": "expB_haiku_verifyTool"}
+PROBE_NAMES_B = {"default": "baseline-default", "verify": "expB-verify", "verify_tool": "expB-verifyTool"}
+SECTION_TITLES_B = ["## 1. 설정 3개 비교", "## 2. 한도와 배치별 비용"]
+ROWS_B = ["성공률", "error_max_turns 건수", "check_result 사용률", "평균 num_turns", "평균 모델 응답 수", "평균 도구 호출 수",
+          "실행당 평균 비용", "일관성 (a) 도구 순서", "일관성 (b) 핵심 인자"]
 SECTION_TITLES = [
     "## 1. 설정 4개 비교",
     "## 2. 과제별 선택률 (과제 x 설정, 3회 중 커스텀 도구를 쓴 횟수)",
     "## 3. 반복별 선택률과 우연 범위",
     "## 4. 정보 효과와 지시 효과 (선택률 차이, 퍼센트 포인트)",
     "## 5. 한도와 배치별 비용",
+    "## 6. 견고성: 과제 단위 사용 과제 수와 선택 변화",
 ]
 EPS = 1e-9
 
@@ -67,10 +75,11 @@ def load_rec(path: Path) -> Rec:
     return Rec(item=item, input_total=total, ts=(summ or {}).get("ts"))
 
 
-def collect(raw_dir) -> dict[str, list[Rec]]:
+def collect(raw_dir, prefixes=None) -> dict[str, list[Rec]]:
     """설정별 최종 실행 로그(..._run{n}.jsonl)만 읽는다. .partial 보관본, _final 폴더, 다른 설정은 제외."""
-    out: dict[str, list[Rec]] = {c: [] for c in COLUMNS}
-    for col, prefix in PREFIXES.items():
+    prefixes = prefixes or PREFIXES
+    out: dict[str, list[Rec]] = {c: [] for c in prefixes}
+    for col, prefix in prefixes.items():
         rx = re.compile("^" + re.escape(prefix) + r"_([EMH]\d+)_run(\d+)\.jsonl$")
         for p in sorted(Path(raw_dir).glob(prefix + "_*_run*.jsonl")):
             if p.is_file() and rx.match(p.name):
@@ -150,12 +159,13 @@ def judge(effect_pp, range_a, range_b, n_reps_a, n_reps_b) -> str:
 
 # ---------------- 표 조립 ----------------
 
-def _sample_cell(labels: dict[str, str], ks: dict[str, int]) -> str:
+def _sample_cell(labels: dict[str, str], ks: dict[str, int], columns=None) -> str:
+    columns = columns or COLUMNS
     uniq = set(labels.values())
-    text = next(iter(uniq)) if len(uniq) == 1 else "; ".join(f"{c}: {labels[c]}" for c in COLUMNS)
-    small = [c for c in COLUMNS if 0 < ks[c] < report.MIN_SAMPLE]
+    text = next(iter(uniq)) if len(uniq) == 1 else "; ".join(f"{c}: {labels[c]}" for c in columns)
+    small = [c for c in columns if 0 < ks[c] < report.MIN_SAMPLE]
     if small:
-        text += f" ⚠ {report.SMALL_SAMPLE_WARNING}(30건 미만" + ("" if len(small) == len(COLUMNS) else ": " + ", ".join(small)) + ")"
+        text += f" ⚠ {report.SMALL_SAMPLE_WARNING}(30건 미만" + ("" if len(small) == len(columns) else ": " + ", ".join(small)) + ")"
     return text
 
 
@@ -189,49 +199,51 @@ class _Out:
                              "denominator": "" if den is None else den, "value": "" if value is None else value, "sample": sample})
 
 
-def _section1(cols, sels, out: _Out) -> list[str]:
-    L = ["| 지표 | " + " | ".join(COLUMNS) + " | 표본 |", "|---|" + "---|" * len(COLUMNS) + "---|"]
+def _section1(cols, sels, out: _Out, columns=None, rows=None) -> list[str]:
+    columns = columns or COLUMNS
+    L = ["| 지표 | " + " | ".join(columns) + " | 표본 |", "|---|" + "---|" * len(columns) + "---|"]
+    want = lambda label: rows is None or label in rows  # noqa: E731
 
     def add(label, cells, labels, ks):
-        L.append(f"| {label} | " + " | ".join(cells[c] for c in COLUMNS) + f" | {_sample_cell(labels, ks)} |")
+        L.append(f"| {label} | " + " | ".join(cells[c] for c in columns) + f" | {_sample_cell(labels, ks, columns)} |")
 
-    def per_cfg(fn):
-        return {c: fn(c) for c in COLUMNS}
-
-    # 1. 성공률, error_max_turns
-    graded = {c: [r for r in cols[c] if r.run.passed is not None] for c in COLUMNS}
-    cells, labels, ks = {}, {}, {}
-    for c in COLUMNS:
-        g = graded[c]
-        ok = sum(r.run.passed for r in g)
-        cells[c] = _fmt_rate(ok, len(g))
-        labels[c], ks[c] = report.sample_label(_per_task(g)), len(g)
-        out.rec("성공률", c, ok, len(g), _pct(ok, len(g)), labels[c])
-    add("성공률", cells, labels, ks)
-    cells, labels, ks = {}, {}, {}
-    for c in COLUMNS:
-        rs = cols[c]
-        mt = [r for r in rs if r.run.subtype == "error_max_turns"]
-        mp = sum(bool(r.run.passed) for r in mt)
-        cells[c] = f"{len(mt)} (통과 {mp})" if rs else "n/a"
-        labels[c], ks[c] = report.sample_label(_per_task(rs)), len(rs)
-        out.rec("error_max_turns 건수", c, len(mt), len(rs), len(mt) if rs else None, labels[c])
-    add("error_max_turns 건수", cells, labels, ks)
-
-    # 2~4. 선택률/사용률
-    for name in ["search_text 선택률", "Grep 사용률", "file_stats 선택률", "Read 사용률", "check_result 사용률"]:
+    if want("성공률"):
+        graded = {c: [r for r in cols[c] if r.run.passed is not None] for c in columns}
         cells, labels, ks = {}, {}, {}
-        for c in COLUMNS:
+        for c in columns:
+            g = graded[c]
+            ok = sum(r.run.passed for r in g)
+            cells[c] = _fmt_rate(ok, len(g))
+            labels[c], ks[c] = report.sample_label(_per_task(g)), len(g)
+            out.rec("성공률", c, ok, len(g), _pct(ok, len(g)), labels[c])
+        add("성공률", cells, labels, ks)
+    if want("error_max_turns 건수"):
+        cells, labels, ks = {}, {}, {}
+        for c in columns:
+            rs = cols[c]
+            mt = [r for r in rs if r.run.subtype == "error_max_turns"]
+            mp = sum(bool(r.run.passed) for r in mt)
+            cells[c] = f"{len(mt)} (통과 {mp})" if rs else "n/a"
+            labels[c], ks[c] = report.sample_label(_per_task(rs)), len(rs)
+            out.rec("error_max_turns 건수", c, len(mt), len(rs), len(mt) if rs else None, labels[c])
+        add("error_max_turns 건수", cells, labels, ks)
+
+    for name in ["search_text 선택률", "Grep 사용률", "file_stats 선택률", "Read 사용률", "check_result 사용률"]:
+        if not want(name):
+            continue
+        cells, labels, ks = {}, {}, {}
+        for c in columns:
             num, den, per = _rate(cols[c], sels[name])
             cells[c] = _fmt_rate(num, den)
             labels[c], ks[c] = report.sample_label(per), den
             out.rec(name, c, num, den, _pct(num, den), labels[c])
         add(name, cells, labels, ks)
 
-    # 5~6. 평균
     def mean_row(label, getter, fmt):
+        if not want(label):
+            return
         cells, labels, ks = {}, {}, {}
-        for c in COLUMNS:
+        for c in columns:
             rs = [r for r in cols[c] if getter(r) is not None]
             cells[c] = fmt(statistics.mean(getter(r) for r in rs)) if rs else "n/a"
             labels[c], ks[c] = report.sample_label(_per_task(rs)), len(rs)
@@ -244,10 +256,11 @@ def _section1(cols, sels, out: _Out) -> list[str]:
     mean_row("실행당 평균 비용", lambda r: r.run.cost, lambda v: f"${v:.4f}")
     mean_row("실행당 평균 입력 토큰", lambda r: r.input_total, lambda v: f"{v:.0f}")
 
-    # 7. 일관성
     for label, idx in (("일관성 (a) 도구 순서", 1), ("일관성 (b) 핵심 인자", 2)):
+        if not want(label):
+            continue
         cells, labels, ks = {}, {}, {}
-        for c in COLUMNS:
+        for c in columns:
             pairs, a, b, per = consistency(cols[c])
             eq = a if idx == 1 else b
             cells[c] = "n/a (0쌍)" if not pairs else f"{100 * eq / pairs:.0f}% ({eq}/{pairs}쌍)"
@@ -337,20 +350,22 @@ def _read_probe(path: Path):
     return ts_cfg, ts_sum, five, seven
 
 
-def _section5(cols, raw_dir, out: _Out) -> list[str]:
+def _section5(cols, raw_dir, out: _Out, columns=None, probe_names=None) -> list[str]:
+    columns = columns or COLUMNS
+    probe_names = probe_names or PROBE_NAMES
     L = ["| 설정 | 호출 | five_hour 시작 | five_hour 종료 | five_hour 델타 | seven_day 시작 | seven_day 종료 | 실행 수 | 비용 합계 |",
          "|---|---|---|---|---|---|---|---|---|"]
     extra = []
-    for c in COLUMNS:
+    for c in columns:
         recs = cols[c]
         starts = {}
-        for p in sorted(Path(raw_dir).glob(f"probe_haiku_{PROBE_NAMES[c]}_inv*_start.jsonl")):
+        for p in sorted(Path(raw_dir).glob(f"probe_haiku_{probe_names[c]}_inv*_start.jsonl")):
             m = re.search(r"_inv(\d+)_start\.jsonl$", p.name)
             if m:
                 starts[int(m.group(1))] = p
         wins = []
         for n, sp in sorted(starts.items()):
-            ep = Path(raw_dir) / f"probe_haiku_{PROBE_NAMES[c]}_inv{n}_end.jsonl"
+            ep = Path(raw_dir) / f"probe_haiku_{probe_names[c]}_inv{n}_end.jsonl"
             if not ep.is_file():
                 extra.append(f"- {c} 호출 {n}: 끝 탐침 없음(창을 정할 수 없어 제외)")
                 continue
@@ -381,6 +396,58 @@ def _section5(cols, raw_dir, out: _Out) -> list[str]:
     return L
 
 
+def task_counts(recs: list[Rec], tasks: dict[str, loader.Task]) -> dict[str, dict]:
+    """쌍 과제별 (커스텀 도구를 쓴 실행 수 k, 실행 수 m, 쌍 이름)."""
+    out = {}
+    for t in tasks.values():
+        for pair in t.overlap_with:
+            if pair not in ("search_text|Grep", "file_stats|Read"):
+                continue
+            rs = [r for r in recs if r.task == t.id]
+            out[t.id] = {"k": sum(r.run.used_custom({pair.split("|")[0]}) for r in rs), "m": len(rs), "pair": pair}
+    return out
+
+
+def _section6(cols, tasks, out: _Out) -> list[str]:
+    counts = {c: task_counts(cols[c], tasks) for c in COLUMNS}
+    L = ["| 지표 | " + " | ".join(COLUMNS) + " | 표본 |", "|---|" + "---|" * len(COLUMNS) + "---|"]
+    for pair, label in (("search_text|Grep", "search_text 쌍 과제 중 한 번이라도 쓴 과제 수"),
+                        ("file_stats|Read", "file_stats 쌍 과제 중 한 번이라도 쓴 과제 수")):
+        cells, labels, ks = {}, {}, {}
+        for c in COLUMNS:
+            sub = {t: v for t, v in counts[c].items() if v["pair"] == pair and v["m"] > 0}
+            any_n = sum(v["k"] >= 1 for v in sub.values())
+            all_n = sum(v["k"] == v["m"] for v in sub.values())
+            cells[c] = f"{any_n}/{len(sub)} (3회 모두 {all_n})" if sub else "n/a"
+            labels[c] = report.sample_label({t: v["m"] for t, v in sub.items()})
+            ks[c] = len(sub)                         # 단위가 과제 수이므로 30 미만 경고는 과제 수 기준
+            out.rec(label, c, any_n, len(sub), _pct(any_n, len(sub)), labels[c])
+            out.rec(label + "(3회 모두)", c, all_n, len(sub), _pct(all_n, len(sub)), labels[c])
+        L.append(f"| {label} | " + " | ".join(cells[c] for c in COLUMNS) + f" | {_sample_cell(labels, ks)} |")
+    L.append("")
+    for c in ("long", "long_directive"):
+        up, down, same = [], [], 0
+        for t in sorted(counts[c]):
+            if t not in counts["default"] or not counts["default"][t]["m"] or not counts[c][t]["m"]:
+                continue
+            d, x = counts["default"][t], counts[c][t]
+            item = f"{t}({d['k']}/{d['m']}→{x['k']}/{x['m']})"
+            if x["k"] > d["k"]:
+                up.append(item)
+            elif x["k"] < d["k"]:
+                down.append(item)
+            else:
+                same += 1
+        for word, lst in (("늘어난", up), ("줄어든", down)):
+            L.append(f"- {c} vs default {word} 과제 {len(lst)}개: " + (", ".join(lst) if lst else "없음"))
+        L.append(f"- {c} vs default 같은 과제 {same}개")
+        out.rec("default 대비 늘어난 과제 수", c, len(up), None, len(up), "")
+        out.rec("default 대비 줄어든 과제 수", c, len(down), None, len(down), "")
+    L += ["", "- 비교 단위는 과제 1개 x 3회(한 과제 3회 중 사용 횟수)라 1/3 → 2/3 같은 작은 차이는 우연 범위 안일 수 있다(표본이 작아 해석에 주의). 0/3 ↔ 3/3처럼 큰 변화만 참고한다(가설).",
+          "- 늘어난/줄어든은 default의 3회 중 사용 횟수와 비교한 값이다. 과제 구성은 쌍 과제 20개(search_text 12, file_stats 8)."]
+    return L
+
+
 def build_compare(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out | None = None) -> str:
     tasks = tasks or {t.id: t for t in loader.load_all() if not t.is_todo}
     out = out if out is not None else _Out()
@@ -389,11 +456,30 @@ def build_compare(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out
             "- 입력: " + ", ".join(f"{c} {len(cols[c])}건" for c in COLUMNS) + ". 최종 실행 로그만 읽는다(.partial, _final 제외). 읽기 전용, 모델 호출 없음.",
             "- 열 이름: default = 베이스라인(도구 설명 기본값), short = 짧은 설명, long = 정보 위주 긴 설명, long_directive = long + 우선 사용 지시 한 문장."]
     bodies = [_section1(cols, sels, out), _section2(cols, tasks, out), _section3(cols, sels, out), _section4(cols, sels, out),
-              _section5(cols, raw_dir, out)]
+              _section5(cols, raw_dir, out), _section6(cols, tasks, out)]
     lines = head + [""]
     for title, body in zip(SECTION_TITLES, bodies):
         lines += [title, ""] + body + [""]
     return "\n".join(lines)
+
+
+def build_compare_b(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out | None = None) -> str:
+    """실험 B(검증 지시) 비교표: default, verify, verify_tool. 지표는 ROWS_B."""
+    tasks = tasks or {t.id: t for t in loader.load_all() if not t.is_todo}
+    out = out if out is not None else _Out()
+    sels = _selections(tasks)
+    head = ["# 실험 B 비교표 (exp_compare)", "",
+            "- 입력: " + ", ".join(f"{c} {len(cols[c])}건" for c in COLUMNS_B) + ". 최종 실행 로그만 읽는다(.partial, _final 제외). 읽기 전용, 모델 호출 없음.",
+            "- 열 이름: default = 베이스라인(프롬프트 v1), verify = v1 + 일반 검증 지시, verify_tool = verify + 결과를 확인할 도구가 있으면 쓰라는 지시. 도구 설명은 모두 default."]
+    bodies = [_section1(cols, sels, out, COLUMNS_B, ROWS_B), _section5(cols, raw_dir, out, COLUMNS_B, PROBE_NAMES_B)]
+    lines = head + [""]
+    for title, body in zip(SECTION_TITLES_B, bodies):
+        lines += [title, ""] + body + [""]
+    return "\n".join(lines)
+
+
+def build_from_dir_b(raw_dir, tasks=None) -> str:
+    return build_compare_b(collect(raw_dir, PREFIXES_B), raw_dir, tasks)
 
 
 def build_from_dir(raw_dir, tasks=None) -> str:
@@ -401,17 +487,22 @@ def build_from_dir(raw_dir, tasks=None) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="실험 A 비교표(읽기 전용, 모델 호출 없음)")
+    ap = argparse.ArgumentParser(description="실험 비교표(읽기 전용, 모델 호출 없음)")
+    ap.add_argument("--exp", choices=["A", "B"], default="A", help="A: default/short/long/long_directive, B: default/verify/verify_tool")
     ap.add_argument("--raw-dir", default="results/raw")
-    ap.add_argument("--out-md", default="results/expA_haiku_compare_summary_inv1.md")
-    ap.add_argument("--out-csv", default="results/expA_haiku_compare_runs.csv")
+    ap.add_argument("--out-md", default=None)
+    ap.add_argument("--out-csv", default=None)
     a = ap.parse_args(argv)
-    cols = collect(a.raw_dir)
-    if not any(cols.values()):
-        print("읽을 로그가 없다", file=sys.stderr)
+    if a.out_md is None:
+        a.out_md = f"results/exp{a.exp}_haiku_compare_summary_inv1.md"
+    if a.out_csv is None:
+        a.out_csv = f"results/exp{a.exp}_haiku_compare_runs.csv"
+    cols = collect(a.raw_dir, PREFIXES if a.exp == "A" else PREFIXES_B)
+    if not any(v for k, v in cols.items() if k != "default" or a.exp == "A"):
+        print("읽을 로그가 없다" if a.exp == "A" else "실험 B 로그가 없다(baseline만 있거나 비어 있음)", file=sys.stderr)
         return 1
     out = _Out()
-    text = build_compare(cols, a.raw_dir, None, out)
+    text = (build_compare if a.exp == "A" else build_compare_b)(cols, a.raw_dir, None, out)
     Path(a.out_md).write_text(text, encoding="utf-8")
     with open(a.out_csv, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["metric", "config", "task", "numerator", "denominator", "value", "sample"])
