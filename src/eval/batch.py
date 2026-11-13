@@ -27,9 +27,10 @@ from typing import Any, Callable
 from claude_agent_sdk import ClaudeAgentOptions, RateLimitEvent, ResultMessage, SystemMessage
 
 from src.agent import guard, runner_agent
-from src.agent.config import COMPARE_MODEL, DEFAULT_MODEL, PROMPTS, VARIANT_PROMPTS, HarnessConfig
+from src.agent.config import COMPARE_MODEL, DEFAULT_MODEL, PROMPTS, VARIANT_PROMPTS, ExperimentConfig, HarnessConfig
 from src.agent.ratelimit import extract_windows
 from src.agent.runner_agent import HARNESS_ENV, TrajectoryWriter, run_task, to_jsonable
+from src.agent.tool_outputs import OUTPUT_VARIANTS
 from src.agent.tools import SERVER_NAME
 
 from . import freeze, loader, report
@@ -52,10 +53,12 @@ CONFIGS: dict[str, Callable[[], HarnessConfig]] = {
     "maxTurns4": lambda: HarnessConfig(max_turns=4),
     "maxTurns5": lambda: HarnessConfig(max_turns=5),
     "maxTurns7": lambda: HarnessConfig(max_turns=7),
+    # 실험 E는 long 설정 위에서 file_stats 출력만 바꾼다(비교 기준은 expA의 long)
+    "longFilename": lambda: ExperimentConfig(tool_desc_version="long", tool_output_variant="filename"),
 }
 ALLOWED_MAX_TURNS = (3, 4, 5, 7)                          # 실험 C 후보(응답 수 분포 기준, plan.md)
 ALLOWED_MODELS = (DEFAULT_MODEL, COMPARE_MODEL)           # 실험 D: haiku(기본), sonnet
-CONFIG_ALIASES = {"long_directive": "longDirective", "verify_tool": "verifyTool"}  # 밑줄 이름은 파일명용 이름으로 바꿔 받는다
+CONFIG_ALIASES = {"long_directive": "longDirective", "verify_tool": "verifyTool", "long_filename": "longFilename"}  # 밑줄 이름은 파일명용 이름으로 바꿔 받는다
 RUN_FILE_RE = re.compile(r"^(?P<exp>[A-Za-z0-9]+)_(?P<model>[a-z]+)_(?P<cfg>[A-Za-z0-9]+)_(?P<task>[EMH]\d{2})_run(?P<n>\d+)\.jsonl$")
 NAME_RE = re.compile(r"^[A-Za-z0-9]+$")
 LIMIT_RE = re.compile(r"rate.?limit|usage limit|limit (reached|exceeded)|hit your .{0,20}limit|quota|overloaded|\b429\b|\b529\b|credit balance", re.I)
@@ -129,6 +132,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                     help="시스템 프롬프트 버전: v1, verify, verify_tool. 실험 B. 설정 이름(파일 라벨)은 default/verify/verifyTool로 정해진다. --config-name과 같이 주면 같은 변형이어야 한다")
     ap.add_argument("--max-turns", dest="max_turns", type=int, default=None,
                     help="실험 C: 최대 턴 수(3, 4, 5, 7만). 설정 이름(파일 라벨)은 maxTurnsN. config 기본값 20은 바꾸지 않는다(베이스라인이 20)")
+    ap.add_argument("--tool-output-variant", dest="tool_output_variant", default=None,
+                    help="실험 E: file_stats 출력 변형(default, filename). filename은 --config-name long과 함께만 쓴다(설정 이름은 longFilename). 다른 변수와 같이 바꿀 수 없다")
     ap.add_argument("--model", dest="model", default=None,
                     help="실험 D: claude-haiku-5-5(기본) 또는 claude-sonnet-5-5만. sonnet이면 파일 이름의 모델 자리가 sonnet이 된다. 다른 변수와 같이 바꿀 수 없다")
     ap.add_argument("--out-dir", default=str(runner_agent.RAW_DIR), help="jsonl과 스냅샷을 둘 폴더(기본 results/raw)")
@@ -148,6 +153,19 @@ def resolve_variant(a: argparse.Namespace) -> None:
 
     모르는 값이거나 서로 다른 변형을 동시에 주면 ValueError(한 번에 변수 하나만 바꾼다). 같은 변형을 여러 방법으로 주는 것은 허용한다.
     """
+    tov = a.tool_output_variant
+    if tov is not None and tov not in OUTPUT_VARIANTS:
+        raise ValueError(f"알 수 없는 --tool-output-variant: {tov} (사용 가능: {list(OUTPUT_VARIANTS)})")
+    if tov == "filename":
+        if a.prompt_version or a.max_turns is not None or a.config not in ("long", "longFilename"):
+            raise ValueError("--tool-output-variant filename은 --config-name long과 함께만 쓴다(도구 설명 long 위에서 출력만 바꾼다). "
+                             "프롬프트, max_turns, 다른 도구 설명과는 같이 바꿀 수 없다")
+        if a.model is not None and a.model != DEFAULT_MODEL:
+            raise ValueError("--model은 다른 변수와 같이 바꿀 수 없다(--tool-output-variant filename)")
+        a.config = "longFilename"
+        return
+    if tov == "default" and a.config == "longFilename":
+        raise ValueError("--config-name longFilename과 --tool-output-variant default는 서로 다른 변형이다")
     requested: list[tuple[str, str]] = []
     if a.prompt_version:
         pv = a.prompt_version

@@ -288,7 +288,11 @@ def test_regrade_on_existing_raw_logs_skips_them_all(capsys):
     """results/raw의 기존 로그(스냅샷 기능 이전)는 스냅샷이 없으므로 모두 건너뛴다. 로컬에 로그가 없으면 건너뛰는 테스트."""
     raw = Path(loader.ROOT / "results" / "raw")
     # 스냅샷 폴더(_final)가 있는 로그는 스냅샷 기능 이후에 만든 로그(배치 러너 실행 등)라 대상이 아니다
-    logs = sorted(p for p in raw.glob("*.jsonl") if not (raw / f"{p.stem}_final").exists())
+    # (스냅샷 이벤트가 있는 로그도 제외: 출력 파일이 안 만들어진 실행(missing_output)은 저장할 파일이 없어 _final 폴더가 없다)
+    def has_snapshot_event(p):
+        return '"kind": "snapshot"' in p.read_text(encoding="utf-8", errors="replace")
+
+    logs = sorted(p for p in raw.glob("*.jsonl") if not (raw / f"{p.stem}_final").exists() and not has_snapshot_event(p))
     if not logs:
         pytest.skip("스냅샷 이전의 로그가 results/raw에 없음")
     res = regrade.regrade_runs(logs, snapshot_root=loader.ROOT / "results" / "raw")

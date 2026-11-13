@@ -81,7 +81,7 @@ def build_options(cfg: HarnessConfig, workdir: Path) -> ClaudeAgentOptions:
         max_turns=cfg.max_turns,
         system_prompt=cfg.system_prompt,
         tools=list(cfg.builtin_tools),
-        mcp_servers={SERVER_NAME: build_server(workdir, cfg.tool_desc_version)},
+        mcp_servers={SERVER_NAME: build_server(workdir, cfg.tool_desc_version, getattr(cfg, "tool_output_variant", "default"))},
         allowed_tools=list(cfg.builtin_tools) + ALLOWED_CUSTOM,
         permission_mode="dontAsk",
         setting_sources=[],

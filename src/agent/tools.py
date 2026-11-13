@@ -5,6 +5,7 @@ from typing import Any
 from claude_agent_sdk import HookMatcher, create_sdk_mcp_server, tool
 
 from .sandbox import SandboxError, check_builtin_tool_input, resolve_in_sandbox
+from .tool_outputs import apply_file_stats_output, validate_output_variant
 from .tool_variants import VARIANT_DESCRIPTIONS
 
 SERVER_NAME = "t"
@@ -129,8 +130,9 @@ def check_result_impl(root: Path, path: str, contains: str = "", min_lines: int 
         return _err(f"error: {e}")
 
 
-def build_server(root: str | Path, desc_version: str = "default"):
-    """root에 묶인 SDK MCP 서버를 만든다."""
+def build_server(root: str | Path, desc_version: str = "default", output_variant: str = "default"):
+    """root에 묶인 SDK MCP 서버를 만든다. output_variant(실험 E)는 file_stats 성공 출력만 바꾸고 기본은 현재 출력 그대로다."""
+    validate_output_variant(output_variant)
     root = Path(root).resolve()
     d = DESCRIPTIONS[desc_version] if desc_version in DESCRIPTIONS else VARIANT_DESCRIPTIONS[desc_version]
 
@@ -140,7 +142,8 @@ def build_server(root: str | Path, desc_version: str = "default"):
 
     @tool("file_stats", d["file_stats"], SCHEMAS["file_stats"])
     async def file_stats(args: dict[str, Any]) -> dict[str, Any]:
-        return file_stats_impl(root, args.get("path", ""))
+        path = args.get("path", "")
+        return apply_file_stats_output(output_variant, path, file_stats_impl(root, path))
 
     @tool("check_result", d["check_result"], SCHEMAS["check_result"])
     async def check_result(args: dict[str, Any]) -> dict[str, Any]:

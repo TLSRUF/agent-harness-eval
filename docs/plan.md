@@ -60,9 +60,9 @@
 
 \- Day 11 - 실험 B 구현: 시스템 프롬프트에 "답하기 전에 결과를 검증하고 필요하면 수정하라" 단계를 추가(토글). 완료 기준: 토글 동작.
 
-\- Day 12 - 실험 B 실행과 분석: 성공률 변화와 비용 증가율 비교. 완료 기준: results/expB 저장.
+\- Day 12 - 실험 B 실행과 분석: 성공률 변화와 비용 증가율 비교. 완료 기준: results/expB 저장. **실행 완료(verify, verify_tool 각 40개 x 3회 = 240회).** 로그 results/raw/expB_haiku_{verify,verifyTool}_*_run*.jsonl(gitignore), 배치 요약 results/expB_haiku_{verify,verifyTool}_summary_inv1.md와 _runs.csv, 비교표 results/expB_haiku_compare_summary_inv1.md와 expB_haiku_compare_runs.csv(`python -m src.eval.exp_compare --exp B`). 실패 분석은 docs/failure_analysis.md.
 
-\- Day 13 - 실험 C: max_turns = {3, 4, 5, 7} 비교(러너 `--max-turns`는 이 값만 허용, 후보는 베이스라인 모델 응답 수 분포 최소 2, 중앙값 4, 90번째 백분위 5, 최대 7 기준. 베이스라인 20과 함께 비교). 턴 제한에 걸려 실패한 비율 기록. 완료 기준: results/expC 저장. max_turns 값은 Day 8 베이스라인의 모델 응답 수 분포(중앙값 4, 90번째 백분위 5, 최대 7)를 보고 정한다. 한도는 num_turns(도구 호출 수 + 1, 최대 24)가 아니라 응답 수 기준으로 보인다(가설, docs/sdk_notes.md 정정 절).
+\- Day 13 - 실험 C: max_turns = {3, 4, 5, 7} 비교(러너 `--max-turns`는 이 값만 허용, 후보는 베이스라인 모델 응답 수 분포 최소 2, 중앙값 4, 90번째 백분위 5, 최대 7 기준. 베이스라인 20과 함께 비교). 턴 제한에 걸려 실패한 비율 기록. 완료 기준: results/expC 저장. max_turns 값은 Day 8 베이스라인의 모델 응답 수 분포(중앙값 4, 90번째 백분위 5, 최대 7)를 보고 정한다. 한도는 num_turns(도구 호출 수 + 1, 최대 24)가 아니라 응답 수 기준으로 보인다(가설, docs/sdk_notes.md 정정 절). **실행 완료(max_turns 3, 4, 5, 7 각 40개 x 3회 = 480회).** 로그 results/raw/expC_haiku_maxTurns{3,4,5,7}_*_run*.jsonl(gitignore), 배치 요약 results/expC_haiku_maxTurns{N}_summary_inv1.md와 _runs.csv, 비교표 results/expC_haiku_compare_summary_inv1.md와 expC_haiku_compare_runs.csv(`python -m src.eval.exp_compare --exp C`, 한계 판정 표 포함). 실패 분석은 docs/failure_analysis.md.
 
 \- Day 14 - 예비일: 밀린 작업, 사용량 한도 대기, 이상 결과 재확인, 채점기 점검. 완료 기준: 지금까지 결과 재현 가능.
 
@@ -74,7 +74,7 @@
 
 \- Day 16 - 실패 분석: 유형 분류(도구 선택 오류, 인자 오류, 반복 루프, 조기 종료, 환각, 채점 불일치), 유형별 건수 표와 대표 사례 3개. 완료 기준: docs/failure\_analysis.md.
 
-\- Day 17 - 개선 실험: 가장 많은 실패 유형 하나를 골라 개선(시스템 프롬프트, 도구 오류 메시지 등), 전후 비교. 완료 기준: 전후 점수 표.
+\- Day 17 - 개선 실험: 가장 많은 실패 유형 하나를 골라 개선(시스템 프롬프트, 도구 오류 메시지 등), 전후 비교. 완료 기준: 전후 점수 표. **구현 완료(실행 전): expE = file_stats 출력 앞에 `path: <입력 경로>` 한 줄(러너 `--config-name long --tool-output-variant filename`, 설정 이름 longFilename).** 배경은 expA, expC에서 관찰된 H01의 파일 이름 짝 맞춤 오류 6건(가설: 출력에 파일 이름이 없는 것이 원인 후보). 대상은 file_stats|Read 쌍 과제 8개(E03, E10, M09, M10, H01, H02, H04, H08) x 3회 = 24회, 비교 기준은 expA의 long 같은 과제 24건(`python -m src.eval.exp_compare --exp E`).
 
 \- Day 18 - 최종 실행과 시각화: 최적 설정으로 Haiku 40개 x 3회. 그래프: 실험별 성공률, 비용 대비 성공률, 난이도별 성공률. 완료 기준: results/final, 그래프 저장.
 

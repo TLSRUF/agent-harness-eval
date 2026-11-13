@@ -233,6 +233,8 @@ options = ClaudeAgentOptions(mcp_servers={"x": server}, allowed_tools=["mcp__x__
 - 영향 정리: ① 베이스라인은 max_turns 20을 바꾸지 않는다(config 기본값). ② error_max_turns가 나오면 `maxturns_fail`/`maxturns_pass`로 따로 집계된다. ③ Day 13(최대 턴 5/20)을 해석할 때 5는 "응답 5번"이 아니라 "도구 호출 약 4번"일 수 있다는 점을 명시한다. ④ 한도 판정 단위를 확인하려면 모델 호출이 필요하다(예: 병렬 호출이 많은 H02에 낮은 max_turns를 주고 중단 지점을 보는 시험). 사용자 승인 없이 하지 않았고 계획에만 둔다.
 
 ### 한계 (한 줄 요약)
+- 실험 C에서 error_max_turns의 대부분은 결과 파일 작성 뒤 마무리 응답에서 잘린 것이어서(통과한 108건 모두 파일이 먼저 만들어짐) 채점 통과율과 정상 종료율(1 - error_max_turns 비율)을 함께 본다.
+- 한계 규칙은 응답 수가 max_turns를 넘으려 할 때 중단하는 것으로 보이며(가설, max_turns 3, 4, 5에서 일치, 7과 20은 확인 불가) 정의는 확정이 아니다.
 - `file_stats`는 출력에 파일 이름이 없어, 파일 여러 개를 병렬로 호출할 때 호출과 결과의 짝을 순서로만 맞춰야 한다. expA에서 H01의 이 짝 맞춤 오류가 5건 관찰됐다(도구 출력은 정확했음). 도구 정의 v1은 동결이라 고치지 않았다.
 - 실험 A는 도구 3개(search_text, file_stats, check_result)의 설명을 동시에 바꾼다. 효과를 도구별로 분리할 수 없다(설정 변형 short, long, long_directive 각각에서 세 도구 설명이 함께 바뀜).
 - 보고되는 num_turns는 도구 호출 수 + 1이지만(베이스라인 120건 모두), max_turns 한도는 이 값이 아니라 모델 응답 수 기준으로 보인다(가설: num_turns 21~24인 성공 실행 3건이 max_turns=20에서 error_max_turns 없이 끝났고 응답 수는 5~7이었다). 한 응답 안의 병렬 호출은 num_turns에서 호출마다 센다.
