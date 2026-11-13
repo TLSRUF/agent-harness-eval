@@ -5,6 +5,7 @@
 from dataclasses import asdict, dataclass
 
 from .prompt_variants import build_variants
+from .tool_outputs import OUTPUT_VARIANTS
 from .tool_variants import VARIANT_DESCRIPTIONS
 
 DEFAULT_MODEL = "claude-haiku-5-5"
@@ -55,3 +56,17 @@ class HarnessConfig:
         d = asdict(self)
         d["builtin_tools"] = list(self.builtin_tools)
         return d
+
+
+@dataclass(frozen=True)
+class ExperimentConfig(HarnessConfig):
+    """실험 E용 설정: HarnessConfig(동결된 기본값)에 도구 출력 변형 하나를 더한다.
+
+    HarnessConfig에 필드를 추가하면 config 기본값 해시(MANIFEST)가 바뀌므로 별도 클래스로 둔다. 기본값 "default"는 현재 출력 그대로다.
+    """
+    tool_output_variant: str = "default"
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.tool_output_variant not in OUTPUT_VARIANTS:
+            raise ValueError(f"unknown tool_output_variant: {self.tool_output_variant}")

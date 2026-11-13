@@ -832,3 +832,73 @@ def test_probe_file_name_for_sonnet_expD(env):
     assert env.run("--experiment", "expD", "--tasks", "E01", "--runs", "1", "--yes", "--model", "claude-sonnet-5-5") == batch.EXIT_OK
     assert (env.out / "probe_sonnet_expD-default_inv1_start.jsonl").exists()
     assert len(env.fake.probe_calls()) == 2 and all(o.model == "claude-haiku-5-5" for _, o in env.fake.probe_calls())   # 탐침은 가장 싼 haiku로
+
+
+# ---------------- 실험 E: --tool-output-variant (long 위에서 file_stats 출력만 바꿈) ----------------
+
+E_BASE = ["--experiment", "expE", "--tasks", "E03", "--runs", "1", "--yes", "--no-probe"]
+
+
+def test_tool_output_variant_filename_runs_long_plus_filename_with_expE_label(env):
+    from src.agent import config as hc
+    assert env.run(*E_BASE, "--config-name", "long", "--tool-output-variant", "filename") == batch.EXIT_OK
+    log = env.out / "expE_haiku_longFilename_E03_run1.jsonl"
+    assert log.exists()
+    cfg = next(e for e in events(log) if e.get("kind") == "config")["config"]
+    assert cfg["tool_desc_version"] == "long" and cfg["tool_output_variant"] == "filename"          # 설정은 로그에 그대로 남는다
+    assert cfg["prompt_version"] == "v1" and cfg["max_turns"] == 20 and cfg["model"] == hc.DEFAULT_MODEL
+    assert _opts_ok(env).system_prompt == hc.PROMPTS["v1"]
+
+
+def test_config_name_long_filename_is_the_same_variant_and_other_configs_have_no_new_field(env):
+    assert batch.parse_args([*E_BASE, "--config-name", "long_filename"]).config == "longFilename"
+    assert env.run(*E_BASE, "--config-name", "longFilename") == batch.EXIT_OK
+    assert (env.out / "expE_haiku_longFilename_E03_run1.jsonl").exists()
+    assert env.run("--experiment", "expA", "--tasks", "E03", "--runs", "1", "--yes", "--no-probe", "--config-name", "long") == batch.EXIT_OK
+    cfg = next(e for e in events(env.out / "expA_haiku_long_E03_run1.jsonl") if e.get("kind") == "config")["config"]
+    assert "tool_output_variant" not in cfg                                                       # 기존 설정의 config 기록은 바뀌지 않는다
+    assert env.run("--experiment", "baseline", "--tasks", "E03", "--runs", "1", "--yes", "--no-probe") == batch.EXIT_OK
+    cfg = next(e for e in events(env.out / "baseline_haiku_default_E03_run1.jsonl") if e.get("kind") == "config")["config"]
+    assert "tool_output_variant" not in cfg
+
+
+def test_tool_output_variant_conflicts_and_unknown_values_are_refused_without_calls(env):
+    n = len(env.fake.calls)
+    f = ["--tool-output-variant", "filename"]
+    assert env.run(*E_BASE, *f) == batch.EXIT_REFUSED                                              # long 없이는 거부(기본 설정 위에 얹지 않는다)
+    assert env.run(*E_BASE, "--config-name", "short", *f) == batch.EXIT_REFUSED
+    assert env.run(*E_BASE, "--config-name", "long", "--prompt-version", "verify", *f) == batch.EXIT_REFUSED
+    assert env.run(*E_BASE, "--config-name", "long", "--max-turns", "3", *f) == batch.EXIT_REFUSED
+    assert env.run(*E_BASE, "--config-name", "long", "--model", "claude-sonnet-5-5", *f) == batch.EXIT_REFUSED
+    assert env.run(*E_BASE, "--config-name", "long", "--tool-output-variant", "upper") == batch.EXIT_REFUSED
+    assert env.run(*E_BASE, "--config-name", "longFilename", "--tool-output-variant", "default") == batch.EXIT_REFUSED
+    assert len(env.fake.calls) == n
+
+
+def test_tool_output_variant_default_is_a_noop(env):
+    assert env.run(*E_BASE, "--config-name", "long", "--tool-output-variant", "default") == batch.EXIT_OK
+    assert (env.out / "expE_haiku_long_E03_run1.jsonl").exists()                                   # long 그대로(라벨도 long)
+    cfg = next(e for e in events(env.out / "expE_haiku_long_E03_run1.jsonl") if e.get("kind") == "config")["config"]
+    assert "tool_output_variant" not in cfg
+
+
+def test_resume_does_not_mix_baseline_expA_and_expE(env):
+    import csv
+    run = lambda exp, *extra: env.run("--experiment", exp, "--tasks", "E03", "--runs", "1", "--yes", "--no-probe", *extra)  # noqa: E731
+    assert run("baseline") == batch.EXIT_OK
+    n0 = len(env.fake.task_calls())
+    assert run("expA", "--config-name", "long") == batch.EXIT_OK
+    assert run("expE", "--config-name", "long", "--tool-output-variant", "filename") == batch.EXIT_OK
+    assert len(env.fake.task_calls()) == n0 + 2
+    assert run("expE", "--config-name", "long", "--tool-output-variant", "filename") == batch.EXIT_OK        # 같은 이름이면 건너뜀
+    assert len(env.fake.task_calls()) == n0 + 2
+    names = sorted(p.name for p in env.out.glob("*_E03_run1.jsonl"))
+    assert names == ["baseline_haiku_default_E03_run1.jsonl", "expA_haiku_long_E03_run1.jsonl", "expE_haiku_longFilename_E03_run1.jsonl"]
+    for stem in ("baseline_haiku_default", "expA_haiku_long", "expE_haiku_longFilename"):
+        with (env.res / f"{stem}_runs.csv").open(encoding="utf-8", newline="") as f:
+            assert [(r["task"], r["run"]) for r in csv.DictReader(f)] == [("E03", "1")]
+
+
+def test_probe_file_name_for_expE(env):
+    assert env.run("--experiment", "expE", "--tasks", "E03", "--runs", "1", "--yes", "--config-name", "long", "--tool-output-variant", "filename") == batch.EXIT_OK
+    assert (env.out / "probe_haiku_expE-longFilename_inv1_start.jsonl").exists()

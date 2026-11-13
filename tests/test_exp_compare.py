@@ -25,7 +25,7 @@ CHECK = "mcp__t__check_result"
 
 
 def make(d: Path, col, task, run, rounds=(), *, passed=True, subtype="success", cost=0.01, usage=(10, 100, 1000), ts=None, suffix=".jsonl",
-         max_turns=20, final=True):
+         max_turns=20, final=True, failure_type=None):
     """rounds: 응답 하나당 [도구 이름 또는 (이름, 입력 dict)] 목록. usage = (input, cache_creation, cache_read)."""
     rows = [{"kind": "config", "task_id": task, "config": {"model": "claude-haiku-5-5", "max_turns": max_turns, "tool_desc_version": col}},
             {"kind": "message", "message": {"_type": "SystemMessage", "subtype": "init", "data": {"cwd": "C:/x", "tools": []}}}]
@@ -41,7 +41,7 @@ def make(d: Path, col, task, run, rounds=(), *, passed=True, subtype="success", 
                                                     "content": [{"_type": "TextBlock", "text": "done"}]}})
     summ = {"kind": "summary", "subtype": subtype, "is_error": subtype != "success", "num_turns": n + 1, "total_cost_usd": cost,
             "usage": {"input_tokens": usage[0], "cache_creation_input_tokens": usage[1], "cache_read_input_tokens": usage[2]},
-            "exception": None, "graded": {"passed": passed, "failure_type": "pass" if passed else "wrong_value"}}
+            "exception": None, "graded": {"passed": passed, "failure_type": "pass" if passed else (failure_type or "wrong_value")}}
     if ts:
         summ["ts"] = ts
     rows.append(summ)
@@ -513,7 +513,7 @@ def test_b_columns_titles_rows_are_fixed(tmp_path):
     text = ec.build_from_dir_b(tmp_path)
     assert ec.COLUMNS_B == COLS_B
     assert text.startswith("# 실험 B 비교표 (exp_compare)\n")
-    assert ec.SECTION_TITLES_B == ["## 1. 설정 3개 비교", "## 2. 한도와 배치별 비용"]
+    assert ec.SECTION_TITLES_B == ["## 1. 설정 3개 비교", "## 2. 과제별 check_result 사용 횟수 (과제 x 설정, 3회 중)", "## 3. 한도와 배치별 비용"]
     assert "| 지표 | default | verify | verify_tool | 표본 |" in text
     sec = text[text.index(ec.SECTION_TITLES_B[0]):text.index(ec.SECTION_TITLES_B[1])]
     rows = [ln.split("|")[1].strip() for ln in sec.splitlines() if ln.startswith("| ") and not ln.startswith("| 지표")]
@@ -571,7 +571,7 @@ def test_b_probes_use_expB_names(tmp_path):
     _probe(tmp_path, "expB-verifyTool", "end", 0.45, 0.2, t1)
     make_b(tmp_path, "verify_tool", OTHER[0], 1, cost=0.1, ts="2026-11-12T03:10:00.000+00:00")
     text = ec.build_from_dir_b(tmp_path)
-    line = next(ln for ln in text[text.index(ec.SECTION_TITLES_B[1]):].splitlines() if ln.startswith("| verify_tool |"))
+    line = next(ln for ln in text[text.index(ec.SECTION_TITLES_B[2]):].splitlines() if ln.startswith("| verify_tool |"))
     assert "+0.05" in line and "| 1 | $0.1000 |" in line
 
 
@@ -631,7 +631,7 @@ def test_c_columns_titles_rows_are_fixed(tmp_path):
     assert "| 지표 | default | 3 | 4 | 5 | 7 | 표본 |" in text
     sec = text[text.index(ec.SECTION_TITLES_C[0]):text.index(ec.SECTION_TITLES_C[1])]
     rows = [ln.split("|")[1].strip() for ln in sec.splitlines() if ln.startswith("| ") and not ln.startswith("| 지표")]
-    assert rows == ["성공률", "error_max_turns 건수(비율)", "error_max_turns인데 채점 통과", "평균 모델 응답 수", "평균 num_turns", "실행당 평균 비용"]
+    assert rows == ["성공률", "정상 종료율", "error_max_turns 건수(비율)", "error_max_turns인데 채점 통과", "평균 모델 응답 수", "평균 num_turns", "실행당 평균 비용"]
     for ln in sec.splitlines():
         if ln.startswith("| ") and not ln.startswith("| 지표"):
             assert re.search(r"N=\d+, 과제당 [\d~]+회.*총 \d+건", ln), ln
@@ -868,3 +868,226 @@ def test_d_no_common_pairs_is_stated_not_crashed(tmp_path):
     make(tmp_path, "sonnet", "H01", 1)
     text = ec.build_from_dir_d(tmp_path)
     assert "같은 (과제, run) 쌍 0건" in text and "n/a" in cells_d(text, "성공률")[1]
+
+
+# ---------------- 실험 B 보강: 과제별 check_result 사용 횟수, 고정 문구 ----------------
+
+def _b_sec(text, i):
+    nxt = ec.SECTION_TITLES_B[i + 1] if i + 1 < len(ec.SECTION_TITLES_B) else None
+    return text[text.index(ec.SECTION_TITLES_B[i]):(text.index(nxt) if nxt else len(text))]
+
+
+def _b_task_setup(tmp_path):
+    for c in COLS_B:
+        fill_b(tmp_path, c)
+    # default: OTHER[0] 1/3 사용. verify: OTHER[0] 3/3, OTHER[1] 2/3, SEARCH[0] 1/3. verify_tool: OTHER[0] 0/3(줄어듦 없음, default 1/3 -> 0/3), OTHER[2] 3/3
+    make_b(tmp_path, "default", OTHER[0], 1, [[CHECK]])
+    for r in (1, 2, 3):
+        make_b(tmp_path, "verify", OTHER[0], r, [[CHECK]])
+        make_b(tmp_path, "verify_tool", OTHER[2], r, [[CHECK]])
+    for r in (1, 2):
+        make_b(tmp_path, "verify", OTHER[1], r, [[CHECK]])
+    make_b(tmp_path, "verify", SEARCH[0], 1, [[CHECK]])
+
+
+def test_b_check_result_note_is_a_fixed_line_right_below_the_main_table(tmp_path):
+    for c in COLS_B:
+        fill_b(tmp_path, c)
+    text = ec.build_from_dir_b(tmp_path)
+    assert ec.CHECK_RESULT_NOTE == "check_result는 파일 존재, 포함 문자열, 최소 줄 수만 확인하며 값의 정확성은 확인하지 않는다. 사용률은 검증 행동의 증가이지 정확성의 증가가 아니다."
+    assert text.count(ec.CHECK_RESULT_NOTE) == 1 and ec.CHECK_RESULT_NOTE in text.splitlines()      # 문구가 한 줄 전체로 들어간다
+    sec1 = _b_sec(text, 0)
+    assert ec.CHECK_RESULT_NOTE in sec1
+    last_row = max(i for i, ln in enumerate(sec1.splitlines()) if ln.startswith("| "))
+    assert sec1.splitlines().index(ec.CHECK_RESULT_NOTE) > last_row                                  # 표 아래
+
+
+def test_b_per_task_check_result_table_counts_out_of_three(tmp_path):
+    _b_task_setup(tmp_path)
+    text = ec.build_from_dir_b(tmp_path)
+    assert ec.SECTION_TITLES_B == ["## 1. 설정 3개 비교", "## 2. 과제별 check_result 사용 횟수 (과제 x 설정, 3회 중)", "## 3. 한도와 배치별 비용"]
+    sec = _b_sec(text, 1)
+    assert "| 과제 | default | verify | verify_tool |" in sec
+    row = lambda t: [c.strip() for c in next(ln for ln in sec.splitlines() if ln.startswith(f"| {t} |")).strip().strip("|").split("|")]
+    assert row(OTHER[0])[1:] == ["1/3", "3/3", "0/3"]
+    assert row(OTHER[1])[1:] == ["0/3", "2/3", "0/3"]
+    assert row(OTHER[2])[1:] == ["0/3", "0/3", "3/3"]
+    assert row(SEARCH[0])[1:] == ["0/3", "1/3", "0/3"]
+    assert sum(1 for ln in sec.splitlines() if ln.startswith("| ") and ln[2:4] != "과제") == len(TASKS)       # 전체 과제
+    assert report.SMALL_SAMPLE_WARNING in sec                                                      # 칸 표본은 3회뿐
+
+
+def test_b_counts_tasks_with_more_and_less_check_result_use_than_default(tmp_path):
+    _b_task_setup(tmp_path)
+    sec = _b_sec(ec.build_from_dir_b(tmp_path), 1)
+    line = lambda p: next(ln for ln in sec.splitlines() if ln.startswith(p))
+    up = line("- verify vs default 늘어난 과제")
+    assert "3개" in up and f"{OTHER[0]}(1/3→3/3)" in up and f"{OTHER[1]}(0/3→2/3)" in up and f"{SEARCH[0]}(0/3→1/3)" in up
+    assert line("- verify vs default 줄어든 과제").endswith("0개: 없음")
+    assert f"{len(TASKS) - 3}개" in line("- verify vs default 같은 과제")
+    up2 = line("- verify_tool vs default 늘어난 과제")
+    assert "1개" in up2 and f"{OTHER[2]}(0/3→3/3)" in up2
+    down2 = line("- verify_tool vs default 줄어든 과제")
+    assert "1개" in down2 and f"{OTHER[0]}(1/3→0/3)" in down2
+
+
+def test_b_per_task_table_with_missing_config_is_na(tmp_path):
+    fill_b(tmp_path, "default")
+    sec = _b_sec(ec.build_from_dir_b(tmp_path), 1)
+    assert "n/a" in sec
+
+
+# ---------------- 실험 C 보강: 정상 종료율 ----------------
+
+def test_c_normal_termination_rate_row_right_below_success_rate(tmp_path):
+    for c in COLS_C:
+        fill_c(tmp_path, c)
+    for r in range(1, 4):
+        make(tmp_path, "3", OTHER[0], r, [[CHECK]] * 3, subtype="error_max_turns", passed=True, final=False, max_turns=3)
+    text = ec.build_from_dir_c(tmp_path)
+    sec = text[text.index(ec.SECTION_TITLES_C[0]):text.index(ec.SECTION_TITLES_C[1])]
+    rows = [ln.split("|")[1].strip() for ln in sec.splitlines() if ln.startswith("| ") and not ln.startswith("| 지표")]
+    assert rows[:3] == ["성공률", "정상 종료율", "error_max_turns 건수(비율)"]
+    total = 3 * len(TASKS)
+    assert ec.ROWS_C[:2] == ["성공률", "정상 종료율"]
+    assert cells_c(text, "정상 종료율")[1] == f"100% ({total}/{total})"
+    assert cells_c(text, "정상 종료율")[2] == f"{100 * (total - 3) / total:.0f}% ({total - 3}/{total})"     # 1 - error_max_turns 비율
+    assert cells_c(text, "성공률")[2] == f"100% ({total}/{total})"                                           # 채점 통과율과 별개
+    assert "N=" in cells_c(text, "정상 종료율")[-1] and "총" in cells_c(text, "정상 종료율")[-1]
+
+
+def test_c_normal_termination_rate_warns_on_small_samples(tmp_path):
+    for t in OTHER[:2]:
+        for r in (1, 2, 3):
+            make(tmp_path, "default", t, r)
+    assert report.SMALL_SAMPLE_WARNING in cells_c(ec.build_from_dir_c(tmp_path), "정상 종료율")[-1]
+
+
+# ---------------- 실험 E: expA long vs expE long + filename (같은 (과제, run) 쌍만) ----------------
+
+PREFIX.update({"long_filename": "expE_haiku_longFilename"})
+COLS_E = ["long", "long_filename"]
+E_TASKS = ["E03", "E10", "M09", "M10", "H01", "H02", "H04", "H08"]
+
+
+def cells_e(text, label):
+    sec = text[text.index(ec.SECTION_TITLES_E[0]):text.index(ec.SECTION_TITLES_E[1])]
+    lines = [ln for ln in sec.splitlines() if ln.startswith(f"| {label}")]
+    assert len(lines) == 1, (label, lines)
+    return [c.strip() for c in lines[0].strip().strip("|").split("|")]
+
+
+def _e_setup(tmp_path):
+    for t in TASKS:
+        for r in (1, 2, 3):
+            make(tmp_path, "long", t, r, [[F_CUSTOM]] if t in E_TASKS else [[S_CUSTOM]], cost=0.01)      # expA long 전체 120건
+    for t in E_TASKS:
+        for r in (1, 2, 3):
+            make(tmp_path, "long_filename", t, r, [[F_CUSTOM]], cost=0.02)
+
+
+def test_e_scope_columns_rows_and_titles_are_fixed(tmp_path):
+    _e_setup(tmp_path)
+    text = ec.build_from_dir_e(tmp_path)
+    assert text.startswith("# 실험 E 비교표 (exp_compare)\n")
+    head = text[:text.index(ec.SECTION_TITLES_E[0])]
+    assert "비교 범위: 같은 (과제, run) 쌍 24건, 과제 8개(E03, E10, H01, H02, H04, H08, M09, M10)" in head
+    assert f"expA long 전체 {3 * len(TASKS)}건 중 24건" in head and "expE 전체 24건 중 24건" in head
+    assert ec.COLUMNS_E == COLS_E
+    assert ec.SECTION_TITLES_E == ["## 1. long vs long + 파일 이름 출력 (같은 (과제, run) 쌍만)", "## 2. 과제별 통과 횟수 (3회 중)", "## 3. 한도와 배치별 비용"]
+    assert "| 지표 | long | long_filename | 표본 |" in text
+    sec = text[text.index(ec.SECTION_TITLES_E[0]):text.index(ec.SECTION_TITLES_E[1])]
+    rows = [ln.split("|")[1].strip() for ln in sec.splitlines() if ln.startswith("| ") and not ln.startswith("| 지표")]
+    assert rows == ["성공률", "실패 유형", "file_stats 선택률", "평균 도구 호출 수", "평균 모델 응답 수", "실행당 평균 비용"]
+    for ln in sec.splitlines():
+        if ln.startswith("| ") and not ln.startswith("| 지표"):
+            assert re.search(r"N=\d+, 과제당 [\d~]+회.*총 \d+건", ln), ln
+    assert report.SMALL_SAMPLE_WARNING in cells_e(text, "성공률")[-1]                                   # 24건 < 30
+
+
+def test_e_compares_only_common_pairs_and_values(tmp_path):
+    _e_setup(tmp_path)
+    make(tmp_path, "long_filename", "H01", 1, [[F_CUSTOM]], passed=False, cost=0.02)
+    make(tmp_path, "long", "H01", 2, [[S_BUILTIN]], passed=False, cost=0.05)
+    make(tmp_path, "long", "H01", 3, [[F_BUILTIN]], passed=False, failure_type="format_error", cost=0.05)
+    make(tmp_path, "long_filename", "E03", 4, [[F_CUSTOM]], cost=9.0)                                      # long에 run4가 없다 -> 제외
+    text = ec.build_from_dir_e(tmp_path)
+    assert "같은 (과제, run) 쌍 24건" in text and "expE 전체 25건 중 24건" in text
+    assert cells_e(text, "성공률")[1] == "92% (22/24)" and cells_e(text, "성공률")[2] == "96% (23/24)"
+    assert cells_e(text, "실패 유형")[1].startswith("wrong_value 1") and "format_error 1" in cells_e(text, "실패 유형")[1]
+    assert cells_e(text, "실패 유형")[2].startswith("wrong_value 1") and "format_error" not in cells_e(text, "실패 유형")[2]
+    assert cells_e(text, "file_stats 선택률")[2] == "100% (24/24)"
+    assert cells_e(text, "file_stats 선택률")[1] == f"{100 * 22 / 24:.0f}% (22/24)"
+    assert cells_e(text, "평균 도구 호출 수")[1] == "1.0"
+    assert cells_e(text, "실행당 평균 비용")[2] == "$0.0200"                                                 # run4(9.0)는 평균에 안 들어간다
+
+
+def test_e_failure_type_none_and_missing_condition(tmp_path):
+    _e_setup(tmp_path)
+    text = ec.build_from_dir_e(tmp_path)
+    assert cells_e(text, "실패 유형")[1] == "실패 없음(0건)" and cells_e(text, "실패 유형")[2] == "실패 없음(0건)"
+    only = tmp_path / "o"
+    only.mkdir()
+    for t in E_TASKS:
+        make(only, "long", t, 1)
+    text = ec.build_from_dir_e(only)
+    assert "같은 (과제, run) 쌍 0건" in text and cells_e(text, "성공률")[2] == "n/a"
+
+
+def test_e_per_task_pass_table(tmp_path):
+    _e_setup(tmp_path)
+    make(tmp_path, "long", "H01", 1, [[F_CUSTOM]], passed=False)
+    make(tmp_path, "long", "H01", 2, [[F_CUSTOM]], passed=False)
+    make(tmp_path, "long_filename", "H01", 3, [[F_CUSTOM]], passed=False)
+    sec = ec.build_from_dir_e(tmp_path)
+    sec = sec[sec.index(ec.SECTION_TITLES_E[1]):sec.index(ec.SECTION_TITLES_E[2])]
+    assert "| 과제 | long | long_filename |" in sec
+    row = lambda t: [c.strip() for c in next(ln for ln in sec.splitlines() if ln.startswith(f"| {t} |")).strip().strip("|").split("|")]
+    assert row("H01")[1:] == ["1/3", "2/3"] and row("E03")[1:] == ["3/3", "3/3"]
+    assert sum(1 for ln in sec.splitlines() if ln.startswith("| ") and ln[2:4] != "과제") == len(E_TASKS)
+    assert report.SMALL_SAMPLE_WARNING in sec
+
+
+def test_e_probes_use_expE_names_and_main_exp_e(tmp_path):
+    t0, t1 = "2026-11-12T03:00:00.000+00:00", "2026-11-12T03:30:00.000+00:00"
+    _probe(tmp_path, "expE-longFilename", "start", 0.40, 0.2, t0)
+    _probe(tmp_path, "expE-longFilename", "end", 0.41, 0.2, t1)
+    make(tmp_path, "long_filename", "H01", 1, cost=0.1, ts="2026-11-12T03:10:00.000+00:00")
+    sec = ec.build_from_dir_e(tmp_path)
+    sec = sec[sec.index(ec.SECTION_TITLES_E[2]):]
+    line = next(ln for ln in sec.splitlines() if ln.startswith("| long_filename |"))
+    assert "+0.01" in line and "| 1 | $0.1000 |" in line
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    for t in E_TASKS:
+        make(raw, "long", t, 1)
+    args = ["--exp", "E", "--raw-dir", str(raw), "--out-md", str(tmp_path / "e.md"), "--out-csv", str(tmp_path / "e.csv")]
+    assert ec.main(args) == 1                                                                         # expA long만 있으면 거부
+    make(raw, "long_filename", "H01", 1)
+    assert ec.main(args) == 0
+    assert (tmp_path / "e.md").read_text(encoding="utf-8").startswith("# 실험 E 비교표")
+
+
+def test_e_collect_does_not_mix_other_experiments_and_tables_are_consistent(tmp_path):
+    _e_setup(tmp_path)
+    fill_all(tmp_path, "short")
+    (tmp_path / "expE_haiku_longFilename_summary.jsonl").write_text("{}", encoding="utf-8")
+    cols = ec.collect(tmp_path, ec.PREFIXES_E)
+    assert len(cols["long"]) == 3 * len(TASKS) and len(cols["long_filename"]) == 24
+    width = None
+    for ln in ec.build_from_dir_e(tmp_path).splitlines():
+        if not ln.startswith("|"):
+            width = None
+            continue
+        n = len(ln.strip().strip("|").split("|"))
+        width = width or n
+        assert n == width, ln
+
+
+def test_e_failure_type_record_counts_only_failures(tmp_path):
+    _e_setup(tmp_path)
+    make(tmp_path, "long", "H01", 1, [[F_CUSTOM]], passed=False)
+    out = ec._Out()
+    ec.build_compare_e(ec.collect(tmp_path, ec.PREFIXES_E), tmp_path, None, out)
+    rec = {r["config"]: r for r in out.records if r["metric"] == "실패 유형"}
+    assert rec["long"]["numerator"] == 1 and rec["long_filename"]["numerator"] == 0              # 통과 실행은 세지 않는다

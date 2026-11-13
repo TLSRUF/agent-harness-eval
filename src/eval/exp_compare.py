@@ -30,18 +30,25 @@ PROBE_NAMES = {"default": "baseline-default", "short": "expA-short", "long": "ex
 COLUMNS_B = ["default", "verify", "verify_tool"]
 PREFIXES_B = {"default": "baseline_haiku_default", "verify": "expB_haiku_verify", "verify_tool": "expB_haiku_verifyTool"}
 PROBE_NAMES_B = {"default": "baseline-default", "verify": "expB-verify", "verify_tool": "expB-verifyTool"}
-SECTION_TITLES_B = ["## 1. 설정 3개 비교", "## 2. 한도와 배치별 비용"]
+SECTION_TITLES_B = ["## 1. 설정 3개 비교", "## 2. 과제별 check_result 사용 횟수 (과제 x 설정, 3회 중)", "## 3. 한도와 배치별 비용"]
+CHECK_RESULT_NOTE = "check_result는 파일 존재, 포함 문자열, 최소 줄 수만 확인하며 값의 정확성은 확인하지 않는다. 사용률은 검증 행동의 증가이지 정확성의 증가가 아니다."
 # 실험 C(max_turns): 열 이름 = 설정 max_turns(default = baseline, max_turns 20)
 COLUMNS_C = ["default", "3", "4", "5", "7"]
 PREFIXES_C = {"default": "baseline_haiku_default", **{n: f"expC_haiku_maxTurns{n}" for n in ("3", "4", "5", "7")}}
 PROBE_NAMES_C = {"default": "baseline-default", **{n: f"expC-maxTurns{n}" for n in ("3", "4", "5", "7")}}
 SECTION_TITLES_C = ["## 1. 설정 5개 비교", "## 2. 한계 판정: 설정 max_turns x 모델 응답 수", "## 3. 한도와 배치별 비용"]
-ROWS_C = ["성공률", "error_max_turns 건수(비율)", "error_max_turns인데 채점 통과", "평균 모델 응답 수", "평균 num_turns", "실행당 평균 비용"]
+ROWS_C = ["성공률", "정상 종료율", "error_max_turns 건수(비율)", "error_max_turns인데 채점 통과", "평균 모델 응답 수", "평균 num_turns", "실행당 평균 비용"]
 # 실험 D(모델 비교): haiku baseline vs sonnet, 같은 (과제, run) 쌍만
 COLUMNS_D = ["haiku", "sonnet"]
 PREFIXES_D = {"haiku": "baseline_haiku_default", "sonnet": "expD_sonnet_default"}
 PROBE_NAMES_D = {"haiku": "baseline-default", "sonnet": "expD-default"}
 PROBE_MODELS_D = {"haiku": "haiku", "sonnet": "sonnet"}
+# 실험 E(출력 변형): 기준 = expA의 long, 비교 = long + file_stats 출력에 파일 이름
+COLUMNS_E = ["long", "long_filename"]
+PREFIXES_E = {"long": "expA_haiku_long", "long_filename": "expE_haiku_longFilename"}
+PROBE_NAMES_E = {"long": "expA-long", "long_filename": "expE-longFilename"}
+SECTION_TITLES_E = ["## 1. long vs long + 파일 이름 출력 (같은 (과제, run) 쌍만)", "## 2. 과제별 통과 횟수 (3회 중)", "## 3. 한도와 배치별 비용"]
+ROWS_E = ["성공률", "실패 유형", "file_stats 선택률", "평균 도구 호출 수", "평균 모델 응답 수", "실행당 평균 비용"]
 SECTION_TITLES_D = ["## 1. haiku vs sonnet (같은 (과제, run) 쌍만)", "## 2. 한도와 배치별 비용"]
 ROWS_D = ["성공률", "error_max_turns 건수", "평균 모델 응답 수", "평균 도구 호출 수", "실행당 평균 비용", "search_text 선택률", "Grep 사용률",
           "file_stats 선택률", "Read 사용률", "일관성 (a) 도구 순서", "일관성 (b) 핵심 인자"]
@@ -243,6 +250,25 @@ def _section1(cols, sels, out: _Out, columns=None, rows=None) -> list[str]:
             out.rec("error_max_turns 건수", c, len(mt), len(rs), len(mt) if rs else None, labels[c])
         add("error_max_turns 건수", cells, labels, ks)
 
+    if rows is not None and "정상 종료율" in rows:                                           # 1 - error_max_turns 비율
+        cells, labels, ks = {}, {}, {}
+        for c in columns:
+            rs = cols[c]
+            ok = sum(r.run.subtype != "error_max_turns" for r in rs)
+            cells[c] = _fmt_rate(ok, len(rs))
+            labels[c], ks[c] = report.sample_label(_per_task(rs)), len(rs)
+            out.rec("정상 종료율", c, ok, len(rs), _pct(ok, len(rs)), labels[c])
+        add("정상 종료율", cells, labels, ks)
+    if rows is not None and "실패 유형" in rows:                                             # 채점기가 기록한 failure_type 그대로
+        cells, labels, ks = {}, {}, {}
+        for c in columns:
+            rs = cols[c]
+            cnt = Counter(r.run.failure_type or "unknown" for r in rs if r.run.passed is False)
+            names = [k for k in report.FAILURE_TYPE_ORDER if k != "pass" and cnt.get(k)] + sorted(k for k in cnt if k not in report.FAILURE_TYPE_ORDER)
+            cells[c] = ("n/a" if not rs else ", ".join(f"{k} {cnt[k]}" for k in names) if names else "실패 없음(0건)")
+            labels[c], ks[c] = report.sample_label(_per_task(rs)), len(rs)
+            out.rec("실패 유형", c, sum(cnt.values()), len(rs), sum(cnt.values()), labels[c])
+        add("실패 유형", cells, labels, ks)
     if rows is not None and "error_max_turns 건수(비율)" in rows:                  # 실험 C 전용 행(다른 실험의 기본 행 목록에는 넣지 않는다)
         cells, labels, ks = {}, {}, {}
         for c in columns:
@@ -500,6 +526,88 @@ def build_compare(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out
     return "\n".join(lines)
 
 
+def _section_b_tasks(cols, tasks, out: _Out) -> list[str]:
+    """과제 x 설정: check_result를 쓴 횟수(3회 중). default 대비 verify, verify_tool에서 늘어난/줄어든 과제."""
+    sel = {c: {} for c in COLUMNS_B}
+    for c in COLUMNS_B:
+        for t in tasks:
+            rs = [r for r in cols[c] if r.task == t]
+            sel[c][t] = (sum(r.run.used_custom({"check_result"}) for r in rs), len(rs))
+    L = ["| 과제 | " + " | ".join(COLUMNS_B) + " |", "|---|" + "---|" * len(COLUMNS_B)]
+    for t in sorted(tasks):
+        cells = []
+        for c in COLUMNS_B:
+            k, m = sel[c][t]
+            cells.append(f"{k}/{m}" if m else "n/a")
+            if m:
+                out.rec("과제별 check_result 사용 횟수", c, k, m, _pct(k, m), report.sample_label({t: m}), task=t)
+        L.append(f"| {t} | " + " | ".join(cells) + " |")
+    L.append("")
+    for c in ("verify", "verify_tool"):
+        up, down, same = [], [], 0
+        for t in sorted(tasks):
+            (dk, dm), (xk, xm) = sel["default"][t], sel[c][t]
+            if not dm or not xm:
+                continue
+            item = f"{t}({dk}/{dm}→{xk}/{xm})"
+            if xk > dk:
+                up.append(item)
+            elif xk < dk:
+                down.append(item)
+            else:
+                same += 1
+        for word, lst in (("늘어난", up), ("줄어든", down)):
+            L.append(f"- {c} vs default {word} 과제 {len(lst)}개: " + (", ".join(lst) if lst else "없음"))
+        L.append(f"- {c} vs default 같은 과제 {same}개")
+        out.rec("default 대비 check_result 늘어난 과제 수", c, len(up), None, len(up), "")
+        out.rec("default 대비 check_result 줄어든 과제 수", c, len(down), None, len(down), "")
+    L += ["", f"- 칸마다 표본은 과제 1개 x 3회뿐이다(총 3건 < {report.MIN_SAMPLE}건). {report.SMALL_SAMPLE_WARNING}. 1/3 -> 2/3 같은 작은 차이는 우연 범위 안일 수 있다(가설)."]
+    return L
+
+
+def _section_pass_by_task(sub, columns, ids, out: _Out) -> list[str]:
+    L = ["| 과제 | " + " | ".join(columns) + " |", "|---|" + "---|" * len(columns)]
+    for t in ids:
+        cells = []
+        for c in columns:
+            rs = [r for r in sub[c] if r.task == t and r.run.passed is not None]
+            k = sum(bool(r.run.passed) for r in rs)
+            cells.append(f"{k}/{len(rs)}" if rs else "n/a")
+            if rs:
+                out.rec("과제별 통과 횟수", c, k, len(rs), _pct(k, len(rs)), report.sample_label({t: len(rs)}), task=t)
+        L.append(f"| {t} | " + " | ".join(cells) + " |")
+    L += ["", f"- 칸마다 표본은 과제 1개 x 3회뿐이다(총 3건 < {report.MIN_SAMPLE}건). {report.SMALL_SAMPLE_WARNING}."]
+    return L
+
+
+def build_compare_e(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out | None = None) -> str:
+    """실험 E: expA long(기준) vs expE long + file_stats 파일 이름 출력. 같은 (과제, run) 쌍만 비교하고 범위를 맨 위에 적는다."""
+    tasks = tasks or {t.id: t for t in loader.load_all() if not t.is_todo}
+    out = out if out is not None else _Out()
+    sels = _selections(tasks)
+    common = {(r.task, r.n) for r in cols["long"]} & {(r.task, r.n) for r in cols["long_filename"]}
+    sub = {c: [r for r in cols[c] if (r.task, r.n) in common] for c in COLUMNS_E}
+    ids = sorted({t for t, _ in common})
+    head = ["# 실험 E 비교표 (exp_compare)", "",
+            f"- 비교 범위: 같은 (과제, run) 쌍 {len(common)}건, 과제 {len(ids)}개({', '.join(ids)}). "
+            f"expA long 전체 {len(cols['long'])}건 중 {len(common)}건, expE 전체 {len(cols['long_filename'])}건 중 {len(common)}건을 비교한다(나머지는 제외).",
+            "- 열 이름: long = expA의 long 설정(비교 기준), long_filename = 같은 long 설정 + file_stats 출력 앞에 `path: <입력 경로>` 한 줄. "
+            "도구 설명 long, 프롬프트 v1, max_turns 20, haiku로 같다.",
+            "- 두 조건은 서로 다른 시기에 실행됐다(시기 효과는 분리하지 못함, 가설 수준으로만 해석).",
+            "- 실패 유형은 채점기가 기록한 failure_type 그대로다."]
+    out.rec("비교 범위(쌍 수)", "long-long_filename", len(common), None, len(common), ", ".join(ids))
+    bodies = [_section1(sub, sels, out, COLUMNS_E, ROWS_E), _section_pass_by_task(sub, COLUMNS_E, ids, out),
+              _section5(cols, raw_dir, out, COLUMNS_E, PROBE_NAMES_E)]
+    lines = head + [""]
+    for title, body in zip(SECTION_TITLES_E, bodies):
+        lines += [title, ""] + body + [""]
+    return "\n".join(lines)
+
+
+def build_from_dir_e(raw_dir, tasks=None) -> str:
+    return build_compare_e(collect(raw_dir, PREFIXES_E), raw_dir, tasks)
+
+
 def build_compare_b(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out | None = None) -> str:
     """실험 B(검증 지시) 비교표: default, verify, verify_tool. 지표는 ROWS_B."""
     tasks = tasks or {t.id: t for t in loader.load_all() if not t.is_todo}
@@ -508,7 +616,8 @@ def build_compare_b(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _O
     head = ["# 실험 B 비교표 (exp_compare)", "",
             "- 입력: " + ", ".join(f"{c} {len(cols[c])}건" for c in COLUMNS_B) + ". 최종 실행 로그만 읽는다(.partial, _final 제외). 읽기 전용, 모델 호출 없음.",
             "- 열 이름: default = 베이스라인(프롬프트 v1), verify = v1 + 일반 검증 지시, verify_tool = verify + 결과를 확인할 도구가 있으면 쓰라는 지시. 도구 설명은 모두 default."]
-    bodies = [_section1(cols, sels, out, COLUMNS_B, ROWS_B), _section5(cols, raw_dir, out, COLUMNS_B, PROBE_NAMES_B)]
+    bodies = [_section1(cols, sels, out, COLUMNS_B, ROWS_B) + ["", CHECK_RESULT_NOTE], _section_b_tasks(cols, sorted(tasks), out),
+              _section5(cols, raw_dir, out, COLUMNS_B, PROBE_NAMES_B)]
     lines = head + [""]
     for title, body in zip(SECTION_TITLES_B, bodies):
         lines += [title, ""] + body + [""]
@@ -634,8 +743,8 @@ def build_from_dir(raw_dir, tasks=None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="실험 비교표(읽기 전용, 모델 호출 없음)")
-    ap.add_argument("--exp", choices=["A", "B", "C", "D"], default="A",
-                    help="A: default/short/long/long_directive, B: default/verify/verify_tool, C: default/max_turns 3,4,5,7, D: haiku vs sonnet")
+    ap.add_argument("--exp", choices=["A", "B", "C", "D", "E"], default="A",
+                    help="A: default/short/long/long_directive, B: default/verify/verify_tool, C: default/max_turns 3,4,5,7, D: haiku vs sonnet, E: long vs long + 파일 이름 출력")
     ap.add_argument("--raw-dir", default="results/raw")
     ap.add_argument("--out-md", default=None)
     ap.add_argument("--out-csv", default=None)
@@ -644,10 +753,10 @@ def main(argv: list[str] | None = None) -> int:
         a.out_md = f"results/exp{a.exp}_haiku_compare_summary_inv1.md"
     if a.out_csv is None:
         a.out_csv = f"results/exp{a.exp}_haiku_compare_runs.csv"
-    prefixes = {"A": PREFIXES, "B": PREFIXES_B, "C": PREFIXES_C, "D": PREFIXES_D}[a.exp]
-    builder = {"A": build_compare, "B": build_compare_b, "C": build_compare_c, "D": build_compare_d}[a.exp]
+    prefixes = {"A": PREFIXES, "B": PREFIXES_B, "C": PREFIXES_C, "D": PREFIXES_D, "E": PREFIXES_E}[a.exp]
+    builder = {"A": build_compare, "B": build_compare_b, "C": build_compare_c, "D": build_compare_d, "E": build_compare_e}[a.exp]
     cols = collect(a.raw_dir, prefixes)
-    baseline_keys = {"A": set(), "B": {"default"}, "C": {"default"}, "D": {"haiku"}}[a.exp]
+    baseline_keys = {"A": set(), "B": {"default"}, "C": {"default"}, "D": {"haiku"}, "E": {"long"}}[a.exp]
     if not any(v for k, v in cols.items() if k not in baseline_keys):
         print("읽을 로그가 없다" if a.exp == "A" else f"실험 {a.exp} 로그가 없다(baseline만 있거나 비어 있음)", file=sys.stderr)
         return 1
