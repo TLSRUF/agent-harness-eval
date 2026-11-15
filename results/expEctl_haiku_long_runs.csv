@@ -1,0 +1,4 @@
+task,run,state,passed,failure_type,num_turns,total_cost_usd,input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens
+H01,1,complete,False,wrong_value,14,0.0015445,10,1079,27470,2111
+H01,2,complete,False,wrong_value,14,0.00154203,10,1089,27503,2117
+H01,3,complete,True,pass,13,0.0014497800000000001,8,1167,20938,1980

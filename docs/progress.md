@@ -239,3 +239,9 @@
 - 한 일: expB verify_tool 3건과 expC 16건 분석(docs/failure_analysis.md; 요청서의 15건이 아니라 16건: max_turns 5는 2건), exp_compare B(과제별 check_result 표, 고정 문구), C(정상 종료율 행), E(`--exp E`) 추가, 실험 E 구현(`tool_outputs.py`, `ExperimentConfig`, 러너 `--tool-output-variant`), 문서(README, sdk_notes, plan).
 - 숫자: expC 실패 16건 중 error_max_turns 14건(결과 파일 없음 11, H05 제자리 수정 불완전 3), success 오답 2건. error_max_turns인데 통과 108건은 모두 결과 파일이 먼저 만들어졌고 50건은 마지막 응답에서, 58건은 그 이전 응답에서 작성. 정상 종료율 3: 34%, 4: 72%, 5: 92%, 7: 100%. verify는 default 대비 check_result 사용 과제가 28개 늘고 0개 줄었으며 verify_tool은 29개 늘고 0개 줄었다. 전체 테스트 879개 통과, freeze --verify 동결 일치.
 - 다음 할 일: 사용자가 expE 24회 실행 -> `python -m src.eval.exp_compare --exp E`.
+## 실험 D(Sonnet), 실험 E 실행 결과 (한 일 / 숫자 / 다음)
+- 한 일: 사용자가 expD(sonnet, 40과제 x 1회 = 40회; 5회 시험 후 나머지 35회)와 expE(longFilename 24회), 별도 대조 expEctl(long, H01 x 3회)을 실행. `exp_compare --exp D`, `--exp E` 출력 저장.
+- 숫자(D): 성공률 haiku 100%(40/40) vs sonnet 100%(40/40), 천장이라 성공률로는 구분 불가. 평균 응답 수 4.0 vs 3.4, 평균 도구 호출 4.9 vs 4.3. 실행당 평균 비용 $0.0015 vs $0.0139(약 9배). file_stats 선택률 5/8 vs 8/8(소표본). 과제당 1회라 일관성은 n/a.
+- 숫자(E): 같은 24쌍에서 성공률 long 88%(21/24) vs long+filename 100%(24/24). 차이는 H01 하나(0/3 -> 3/3)뿐, 나머지 7개 과제는 3/3 동일. 선택률 100% 동일, 평균 도구 호출 11.6 동일, 응답 수 4.8 vs 5.0, 비용 $0.0019 vs $0.0020. 소표본(24 < 30).
+- 숫자(대조 expEctl): 파일 이름 출력 없이 long으로 H01을 지금 시기에 3회 다시 돌린 결과 1/3 통과(wrong_value 2). 따라서 H01 0/3 -> 3/3은 시기 효과나 우연 가능성을 배제하지 못한다. 개선 효과는 가설 수준이며 확정 불가(H01 표본이 3 vs 3이고 대조도 3회).
+- 다음 할 일: H01 대조를 늘릴지(예: filename 변형과 long 각각 H01 추가 반복) 결정, 실험 D 전체 해석 정리(천장 효과: 모델 차이는 비용과 응답 수에서만 관찰).
