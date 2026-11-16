@@ -74,7 +74,7 @@
 
 \- Day 16 - 실패 분석: 유형 분류(도구 선택 오류, 인자 오류, 반복 루프, 조기 종료, 환각, 채점 불일치), 유형별 건수 표와 대표 사례 3개. 완료 기준: docs/failure\_analysis.md.
 
-\- Day 17 - 개선 실험: 가장 많은 실패 유형 하나를 골라 개선(시스템 프롬프트, 도구 오류 메시지 등), 전후 비교. 완료 기준: 전후 점수 표. **구현 완료(실행 전): expE = file_stats 출력 앞에 `path: <입력 경로>` 한 줄(러너 `--config-name long --tool-output-variant filename`, 설정 이름 longFilename).** 배경은 expA, expC에서 관찰된 H01의 파일 이름 짝 맞춤 오류 6건(가설: 출력에 파일 이름이 없는 것이 원인 후보). 대상은 file_stats|Read 쌍 과제 8개(E03, E10, M09, M10, H01, H02, H04, H08) x 3회 = 24회, 비교 기준은 expA의 long 같은 과제 24건(`python -m src.eval.exp_compare --exp E`).
+\- Day 17 - 개선 실험: 가장 많은 실패 유형 하나를 골라 개선(시스템 프롬프트, 도구 오류 메시지 등), 전후 비교. 완료 기준: 전후 점수 표. **expE 실행 완료(24회): file_stats 출력 앞에 `path: <입력 경로>` 한 줄(러너 `--config-name long --tool-output-variant filename`, 설정 이름 longFilename). 결과는 results/expE_haiku_compare_summary_inv1.md. H01 0/3 -> 3/3이지만 같은 시기 대조(expEctl, H01 x 3)가 1/3이라 효과는 가설 수준.** **expF 구현 완료(실행 전): search_text 출력 맨 앞에 `total matches: <전체 일치 줄 수>` 한 줄(`--tool-output-variant countline`, 설정 이름 longCountline, filename과 함께 주려면 `filename+countline`). 대상은 search_text|Grep 쌍 과제 E01, M01, M05, M07 x 5회 = 조건당 20회(expF 변형, expFctl 변형 없는 long), `python -m src.eval.exp_compare --exp F`. 배경: B, C의 세기 과제 실패가 Grep count 모드를 쓰지 않은 실행에 몰렸다(사후 분석, 가설).** 그래프는 `python -m src.eval.plots`로 results/figures에 만든다. 배경은 expA, expC에서 관찰된 H01의 파일 이름 짝 맞춤 오류 6건(가설: 출력에 파일 이름이 없는 것이 원인 후보). 대상은 file_stats|Read 쌍 과제 8개(E03, E10, M09, M10, H01, H02, H04, H08) x 3회 = 24회, 비교 기준은 expA의 long 같은 과제 24건(`python -m src.eval.exp_compare --exp E`).
 
 \- Day 18 - 최종 실행과 시각화: 최적 설정으로 Haiku 40개 x 3회. 그래프: 실험별 성공률, 비용 대비 성공률, 난이도별 성공률. 완료 기준: results/final, 그래프 저장.
 

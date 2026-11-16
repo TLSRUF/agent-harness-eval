@@ -1091,3 +1091,160 @@ def test_e_failure_type_record_counts_only_failures(tmp_path):
     ec.build_compare_e(ec.collect(tmp_path, ec.PREFIXES_E), tmp_path, None, out)
     rec = {r["config"]: r for r in out.records if r["metric"] == "실패 유형"}
     assert rec["long"]["numerator"] == 1 and rec["long_filename"]["numerator"] == 0              # 통과 실행은 세지 않는다
+
+
+# ---------------- 실험 F: expFctl(long) vs expF(long + countline), 같은 (과제, run) 쌍만 ----------------
+
+PREFIX.update({"f_long": "expFctl_haiku_long", "f_countline": "expF_haiku_longCountline"})
+COLS_F = ["long", "long_countline"]
+F_TASKS = ["E01", "M01", "M05", "M07"]
+GREP_COUNT = (S_BUILTIN, {"output_mode": "count", "pattern": "x"})
+GREP_PLAIN = (S_BUILTIN, {"pattern": "x"})
+
+
+def cells_f(text, label):
+    sec = text[text.index(ec.SECTION_TITLES_F[0]):text.index(ec.SECTION_TITLES_F[1])]
+    lines = [ln for ln in sec.splitlines() if ln.startswith(f"| {label}")]
+    assert len(lines) == 1, (label, lines)
+    return [c.strip() for c in lines[0].strip().strip("|").split("|")]
+
+
+def mk_f(d, col, task, run, rounds=(), **kw):
+    """f_long -> expFctl_haiku_long, f_countline -> expF_haiku_longCountline 파일로 쓴다."""
+    return make(d, col, task, run, rounds, **kw)
+
+
+def _f_setup(tmp_path, runs=5):
+    for t in F_TASKS:
+        for r in range(1, runs + 1):
+            mk_f(tmp_path, "f_long", t, r, [[S_CUSTOM]], cost=0.01)
+            mk_f(tmp_path, "f_countline", t, r, [[S_CUSTOM]], cost=0.02)
+
+
+def test_f_scope_columns_rows_titles_and_top_warning(tmp_path):
+    _f_setup(tmp_path)
+    text = ec.build_from_dir_f(tmp_path)
+    assert text.startswith("# 실험 F 비교표 (exp_compare)\n")
+    head = text[:text.index(ec.SECTION_TITLES_F[0])]
+    assert "비교 범위: 같은 (과제, run) 쌍 20건, 과제 4개(E01, M01, M05, M07)" in head
+    assert "expFctl 전체 20건 중 20건" in head and "expF 전체 20건 중 20건" in head
+    assert report.SMALL_SAMPLE_WARNING in head and "30건 미만" in head                                  # 소표본 경고가 맨 위에도 있다
+    assert "같은 시기에 연달아" in head and "시기 효과" in head                                           # 연달아 실행한다는 메모
+    assert ec.COLUMNS_F == COLS_F
+    assert ec.SECTION_TITLES_F == ["## 1. long(expFctl) vs long + 일치 개수 출력(expF) (같은 (과제, run) 쌍만)",
+                                   "## 2. 과제별 통과 횟수와 Grep count 모드 사용 횟수 (5회 중)", "## 3. 한도와 배치별 비용"]
+    assert "| 지표 | long | long_countline | 표본 |" in text
+    sec = text[text.index(ec.SECTION_TITLES_F[0]):text.index(ec.SECTION_TITLES_F[1])]
+    rows = [ln.split("|")[1].strip() for ln in sec.splitlines() if ln.startswith("| ") and not ln.startswith("| 지표")]
+    assert rows == ["성공률", "실패 유형", "search_text 선택률", "Grep 사용률", "Grep count 모드 사용률", "평균 모델 응답 수", "평균 도구 호출 수", "실행당 평균 비용"]
+    for ln in sec.splitlines():
+        if ln.startswith("| ") and not ln.startswith("| 지표"):
+            assert re.search(r"N=\d+, 과제당 [\d~]+회.*총 \d+건", ln), ln
+    assert report.SMALL_SAMPLE_WARNING in cells_f(text, "성공률")[-1]
+
+
+def test_f_values_common_pairs_and_count_mode(tmp_path):
+    _f_setup(tmp_path)
+    mk_f(tmp_path, "f_long", "M01", 1, [[GREP_COUNT]], passed=False, cost=0.01)                        # long: Grep count 모드 사용, 실패
+    mk_f(tmp_path, "f_long", "M05", 2, [[GREP_PLAIN]], cost=0.01)
+    mk_f(tmp_path, "f_countline", "M07", 1, [[S_CUSTOM, GREP_PLAIN]], passed=False, failure_type="format_error", cost=0.02)
+    mk_f(tmp_path, "f_countline", "M07", 2, [[S_CUSTOM, GREP_PLAIN]], cost=0.02)
+    mk_f(tmp_path, "f_countline", "E01", 6, [[S_CUSTOM]], cost=9.0)                                    # long에 run6이 없다 -> 제외
+    text = ec.build_from_dir_f(tmp_path)
+    assert "같은 (과제, run) 쌍 20건" in text and "expF 전체 21건 중 20건" in text
+    assert cells_f(text, "성공률")[1] == "95% (19/20)" and cells_f(text, "성공률")[2] == "95% (19/20)"
+    assert cells_f(text, "실패 유형")[1] == "wrong_value 1" and cells_f(text, "실패 유형")[2] == "format_error 1"
+    assert cells_f(text, "search_text 선택률")[1] == "90% (18/20)" and cells_f(text, "search_text 선택률")[2] == "100% (20/20)"
+    assert cells_f(text, "Grep 사용률")[1] == "10% (2/20)" and cells_f(text, "Grep 사용률")[2] == "10% (2/20)"
+    assert cells_f(text, "Grep count 모드 사용률")[1] == "5% (1/20)" and cells_f(text, "Grep count 모드 사용률")[2] == "0% (0/20)"
+    assert cells_f(text, "평균 도구 호출 수")[1] == "1.0" and cells_f(text, "평균 도구 호출 수")[2] == "1.1"
+    assert cells_f(text, "실행당 평균 비용")[2] == "$0.0200"                                              # run6(9.0)은 평균에 안 들어간다
+
+
+def test_f_count_mode_requires_output_mode_count_on_grep_only(tmp_path):
+    _f_setup(tmp_path)
+    mk_f(tmp_path, "f_long", "E01", 1, [[(S_BUILTIN, {"output_mode": "content", "pattern": "x"})]])    # content 모드는 count가 아니다
+    mk_f(tmp_path, "f_long", "E01", 2, [[(S_CUSTOM, {"output_mode": "count"})]])                        # 커스텀 도구 입력의 같은 이름은 세지 않는다
+    mk_f(tmp_path, "f_long", "E01", 3, [[(F_BUILTIN, {"output_mode": "count"})]])                      # 다른 내장 도구도 세지 않는다
+    mk_f(tmp_path, "f_long", "E01", 4, [["Grep"]])                                                      # 입력 없음
+    mk_f(tmp_path, "f_long", "E01", 5, [[GREP_COUNT]])
+    text = ec.build_from_dir_f(tmp_path)
+    assert cells_f(text, "Grep count 모드 사용률")[1] == "5% (1/20)"
+
+
+def test_f_failure_type_none_and_missing_condition(tmp_path):
+    _f_setup(tmp_path)
+    text = ec.build_from_dir_f(tmp_path)
+    assert cells_f(text, "실패 유형")[1] == "실패 없음(0건)" and cells_f(text, "실패 유형")[2] == "실패 없음(0건)"
+    only = tmp_path / "o"
+    only.mkdir()
+    for t in F_TASKS:
+        mk_f(only, "f_long", t, 1)
+    text = ec.build_from_dir_f(only)
+    assert "같은 (과제, run) 쌍 0건" in text and cells_f(text, "성공률")[2] == "n/a"
+
+
+def test_f_per_task_table_has_passes_and_count_mode_uses(tmp_path):
+    _f_setup(tmp_path)
+    mk_f(tmp_path, "f_long", "M01", 1, [[GREP_COUNT]], passed=False)
+    mk_f(tmp_path, "f_long", "M01", 2, [[GREP_COUNT]])
+    mk_f(tmp_path, "f_countline", "M01", 3, [[S_CUSTOM]], passed=False)
+    sec = ec.build_from_dir_f(tmp_path)
+    sec = sec[sec.index(ec.SECTION_TITLES_F[1]):sec.index(ec.SECTION_TITLES_F[2])]
+    assert "| 과제 | long 통과 | long_countline 통과 | long count 모드 | long_countline count 모드 |" in sec
+    row = lambda t: [c.strip() for c in next(ln for ln in sec.splitlines() if ln.startswith(f"| {t} |")).strip().strip("|").split("|")]
+    assert row("M01")[1:] == ["4/5", "4/5", "2/5", "0/5"] and row("E01")[1:] == ["5/5", "5/5", "0/5", "0/5"]
+    assert sum(1 for ln in sec.splitlines() if ln.startswith("| ") and ln[2:4] != "과제") == len(F_TASKS)
+    assert "x 5회뿐" in sec and report.SMALL_SAMPLE_WARNING in sec
+
+
+def test_f_probes_use_expF_names_and_main_exp_f(tmp_path):
+    t0, t1 = "2026-11-16T03:00:00.000+00:00", "2026-11-16T03:30:00.000+00:00"
+    t2, t3 = "2026-11-16T03:40:00.000+00:00", "2026-11-16T04:10:00.000+00:00"
+    _probe(tmp_path, "expFctl-long", "start", 0.40, 0.2, t0)
+    _probe(tmp_path, "expFctl-long", "end", 0.41, 0.2, t1)
+    _probe(tmp_path, "expF-longCountline", "start", 0.41, 0.2, t2)
+    _probe(tmp_path, "expF-longCountline", "end", 0.43, 0.2, t3)
+    mk_f(tmp_path, "f_long", "E01", 1, cost=0.1, ts="2026-11-16T03:10:00.000+00:00")
+    mk_f(tmp_path, "f_countline", "E01", 1, cost=0.2, ts="2026-11-16T03:50:00.000+00:00")
+    sec = ec.build_from_dir_f(tmp_path)
+    sec = sec[sec.index(ec.SECTION_TITLES_F[2]):]
+    assert "+0.01" in next(ln for ln in sec.splitlines() if ln.startswith("| long |")) and "$0.1000" in sec
+    assert "+0.02" in next(ln for ln in sec.splitlines() if ln.startswith("| long_countline |")) and "$0.2000" in sec
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    for t in F_TASKS:
+        mk_f(raw, "f_long", t, 1)
+    args = ["--exp", "F", "--raw-dir", str(raw), "--out-md", str(tmp_path / "f.md"), "--out-csv", str(tmp_path / "f.csv")]
+    assert ec.main(args) == 1                                                                          # expFctl만 있으면 거부
+    mk_f(raw, "f_countline", "E01", 1)
+    assert ec.main(args) == 0
+    assert (tmp_path / "f.md").read_text(encoding="utf-8").startswith("# 실험 F 비교표")
+    assert (tmp_path / "f.csv").exists()
+
+
+def test_f_collect_does_not_mix_other_experiments_and_tables_are_consistent(tmp_path):
+    _f_setup(tmp_path)
+    fill_all(tmp_path, "long")                                                                         # expA long(120건)은 F에 섞이지 않는다
+    for t in E_TASKS:
+        make(tmp_path, "long_filename", t, 1)                                                          # expE도 섞이지 않는다
+    cols = ec.collect(tmp_path, ec.PREFIXES_F)
+    assert len(cols["long"]) == 20 and len(cols["long_countline"]) == 20
+    width = None
+    for ln in ec.build_from_dir_f(tmp_path).splitlines():
+        if not ln.startswith("|"):
+            width = None
+            continue
+        n = len(ln.strip().strip("|").split("|"))
+        width = width or n
+        assert n == width, ln
+
+
+def test_f_failure_type_record_counts_only_failures(tmp_path):
+    _f_setup(tmp_path)
+    mk_f(tmp_path, "f_long", "M01", 1, [[S_CUSTOM]], passed=False)
+    out = ec._Out()
+    ec.build_compare_f(ec.collect(tmp_path, ec.PREFIXES_F), tmp_path, None, out)
+    rec = {r["config"]: r for r in out.records if r["metric"] == "실패 유형"}
+    assert rec["long"]["numerator"] == 1 and rec["long_countline"]["numerator"] == 0
+    assert any(r["metric"] == "비교 범위(쌍 수)" and r["numerator"] == 20 for r in out.records)

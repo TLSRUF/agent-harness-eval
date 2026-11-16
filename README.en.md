@@ -14,6 +14,7 @@ This harness blocks external connectors linked to the account from being loaded 
 1. Python 3.12: `py -3.12 -m venv .venv`, then `pip install -r requirements.txt`
 2. Authentication: `claude login` or `ANTHROPIC_API_KEY` (use only one of the two, never both)
 3. `python -m src.agent.smoke`
+4. Comparison tables `python -m src.eval.exp_compare --exp A..F`, figures `python -m src.eval.plots` (writes results/figures, reads logs only)
 
 ## Limitations
 - The `file_stats` tool counts lines with `str.splitlines()`, so lone CR, U+2028 and similar characters are also treated as line breaks; the evaluation fixtures contain no such characters.

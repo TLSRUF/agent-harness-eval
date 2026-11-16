@@ -245,3 +245,14 @@
 - 숫자(E): 같은 24쌍에서 성공률 long 88%(21/24) vs long+filename 100%(24/24). 차이는 H01 하나(0/3 -> 3/3)뿐, 나머지 7개 과제는 3/3 동일. 선택률 100% 동일, 평균 도구 호출 11.6 동일, 응답 수 4.8 vs 5.0, 비용 $0.0019 vs $0.0020. 소표본(24 < 30).
 - 숫자(대조 expEctl): 파일 이름 출력 없이 long으로 H01을 지금 시기에 3회 다시 돌린 결과 1/3 통과(wrong_value 2). 따라서 H01 0/3 -> 3/3은 시기 효과나 우연 가능성을 배제하지 못한다. 개선 효과는 가설 수준이며 확정 불가(H01 표본이 3 vs 3이고 대조도 3회).
 - 다음 할 일: H01 대조를 늘릴지(예: filename 변형과 long 각각 H01 추가 반복) 결정, 실험 D 전체 해석 정리(천장 효과: 모델 차이는 비용과 응답 수에서만 관찰).
+## 실험 F 구현과 그래프 스크립트 — 단위 테스트 첫 실행 기록 (구현 전)
+- 1번(B, C 실패 분석, exp_compare C 정상 종료율, B 과제별 check_result 표와 고정 문구)은 직전 Day 12 요청에서 이미 처리해 푸시했으므로(`40f663d`) 건너뜀.
+- 테스트를 구현보다 먼저 작성: tests/test_tool_outputs.py 새 7개 + 기존 1개 수정(OUTPUT_VARIANTS 값), tests/test_batch.py 새 6개(`--tool-output-variant countline`, filename+countline, expFctl, 충돌 거부, 이어하기 분리, 탐침 이름), tests/test_exp_compare.py 새 9개(`--exp F`), tests/test_plots.py 새 15개(합성 로그).
+- 구현 전 실행: 전체 900개 수집 중 새 테스트 18개 + 수정한 기존 1개 = 19개 실패(countline 변형 미지원 ValueError/argparse 오류, build_from_dir_f 등 심볼 없음), test_plots.py는 모듈이 없어 수집 단계 ImportError. 나머지 881개 통과. 아직 구현하지 않은 기능 때문이며 예상과 같다.
+- 참고: 충돌 거부 테스트(test_countline_conflicts_are_refused_without_calls)와 expFctl 테스트는 구현 전에도 통과한다(모르는 값도 거부되므로). 구현 후 변이 시험으로 이 테스트가 실제 규칙을 잡는지 확인한다.
+## 실험 F 구현과 그래프 스크립트 (한 일 / 숫자 / 다음)
+- 구현 후 첫 실행: 새 테스트 모두 통과했으나 test_batch 1개 실패(테스트 자체 오류: 파일 이름 정렬에서 expF_ 가 expFctl 보다 앞인 것을 반대로 적음) -> 테스트 수정. 구현 버그 아님.
+- 한 일: `--tool-output-variant countline`(search_text 출력 맨 앞에 `total matches: <전체 일치 줄 수>`, MAX_RESULTS 50으로 자르기 전 개수), `filename+countline`(둘 다 적용), 설정 이름 longCountline/longFilenameCountline, expFctl은 변형 없는 long. exp_compare `--exp F`(같은 (과제, run) 쌍, Grep count 모드 사용률 행, 과제별 표, 소표본 경고와 같은 시기 연달아 실행 메모를 맨 위에). src/eval/plots.py(그림 6개, results/figures).
+- 숫자: 전체 테스트 917개 통과, freeze --verify 동결 일치(HarnessConfig, 도구 정의 v1 해시 그대로), 변이 18가지 중 17가지 즉시 테스트 실패, 1가지(그림 1을 설정 1개로도 만드는 변이)는 살아남아 테스트 추가. 기본 출력 바이트 동일은 골든 값 테스트로 확인(search_text: `a.txt:1:hello world`...).
+- 측정값 기반 비용 상한(4과제 최대값, 120건 근거): 조건당 $0.052, 두 조건 40회 $0.103. 건당 평균 약 $0.002, 실행 시간 expA long 같은 12건 평균 7.0초/건(탐침 시간은 미측정).
+- 다음 할 일: 사용자가 expFctl 20회, expF 20회 실행 -> `python -m src.eval.exp_compare --exp F` -> `python -m src.eval.plots`(그림 5에 F 패널 추가됨).
