@@ -902,3 +902,77 @@ def test_resume_does_not_mix_baseline_expA_and_expE(env):
 def test_probe_file_name_for_expE(env):
     assert env.run("--experiment", "expE", "--tasks", "E03", "--runs", "1", "--yes", "--config-name", "long", "--tool-output-variant", "filename") == batch.EXIT_OK
     assert (env.out / "probe_haiku_expE-longFilename_inv1_start.jsonl").exists()
+
+
+# ---------------- 실험 F: --tool-output-variant countline (long 위에서 search_text 출력만 바꿈), expFctl은 변형 없는 long ----------------
+
+F_BASE = ["--experiment", "expF", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe"]
+
+
+def test_tool_output_variant_countline_runs_long_plus_countline_with_expF_label(env):
+    from src.agent import config as hc
+    assert env.run(*F_BASE, "--config-name", "long", "--tool-output-variant", "countline") == batch.EXIT_OK
+    log = env.out / "expF_haiku_longCountline_E01_run1.jsonl"
+    assert log.exists()
+    cfg = next(e for e in events(log) if e.get("kind") == "config")["config"]
+    assert cfg["tool_desc_version"] == "long" and cfg["tool_output_variant"] == "countline"
+    assert cfg["prompt_version"] == "v1" and cfg["max_turns"] == 20 and cfg["model"] == hc.DEFAULT_MODEL
+    assert _opts_ok(env).system_prompt == hc.PROMPTS["v1"]
+
+
+def test_countline_aliases_and_both_variants_get_their_own_labels(env):
+    assert batch.parse_args([*F_BASE, "--config-name", "long_countline"]).config == "longCountline"
+    a = batch.parse_args([*F_BASE, "--config-name", "long", "--tool-output-variant", "filename+countline"])
+    batch.resolve_variant(a)
+    assert a.config == "longFilenameCountline"
+    assert env.run(*F_BASE, "--config-name", "long", "--tool-output-variant", "filename+countline") == batch.EXIT_OK
+    cfg = next(e for e in events(env.out / "expF_haiku_longFilenameCountline_E01_run1.jsonl") if e.get("kind") == "config")["config"]
+    assert cfg["tool_output_variant"] == "filename+countline"
+
+
+def test_expFctl_is_plain_long_without_the_new_config_field(env):
+    assert env.run("--experiment", "expFctl", "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", "--config-name", "long") == batch.EXIT_OK
+    log = env.out / "expFctl_haiku_long_E01_run1.jsonl"
+    cfg = next(e for e in events(log) if e.get("kind") == "config")["config"]
+    assert cfg["tool_desc_version"] == "long" and "tool_output_variant" not in cfg
+
+
+def test_countline_conflicts_are_refused_without_calls(env):
+    n = len(env.fake.calls)
+    c = ["--tool-output-variant", "countline"]
+    assert env.run(*F_BASE, *c) == batch.EXIT_REFUSED
+    assert env.run(*F_BASE, "--config-name", "short", *c) == batch.EXIT_REFUSED
+    assert env.run(*F_BASE, "--config-name", "longFilename", *c) == batch.EXIT_REFUSED
+    assert env.run(*F_BASE, "--config-name", "long", "--prompt-version", "verify", *c) == batch.EXIT_REFUSED
+    assert env.run(*F_BASE, "--config-name", "long", "--max-turns", "3", *c) == batch.EXIT_REFUSED
+    assert env.run(*F_BASE, "--config-name", "long", "--model", "claude-sonnet-5-5", *c) == batch.EXIT_REFUSED
+    assert env.run(*F_BASE, "--config-name", "longCountline", "--tool-output-variant", "default") == batch.EXIT_REFUSED
+    assert env.run(*F_BASE, "--config-name", "longCountline", "--tool-output-variant", "filename") == batch.EXIT_REFUSED
+    assert len(env.fake.calls) == n
+
+
+def test_resume_does_not_mix_expA_expE_expF_and_expFctl(env):
+    import csv
+    run = lambda exp, *extra: env.run("--experiment", exp, "--tasks", "E01", "--runs", "1", "--yes", "--no-probe", *extra)  # noqa: E731
+    assert run("expA", "--config-name", "long") == batch.EXIT_OK
+    n0 = len(env.fake.task_calls())
+    assert run("expFctl", "--config-name", "long") == batch.EXIT_OK
+    assert run("expF", "--config-name", "long", "--tool-output-variant", "countline") == batch.EXIT_OK
+    assert run("expE", "--config-name", "long", "--tool-output-variant", "filename") == batch.EXIT_OK
+    assert len(env.fake.task_calls()) == n0 + 3
+    assert run("expFctl", "--config-name", "long") == batch.EXIT_OK                                                   # 같은 이름이면 건너뜀
+    assert run("expF", "--config-name", "long", "--tool-output-variant", "countline") == batch.EXIT_OK
+    assert len(env.fake.task_calls()) == n0 + 3
+    names = sorted(p.name for p in env.out.glob("*_E01_run1.jsonl"))
+    assert names == ["expA_haiku_long_E01_run1.jsonl", "expE_haiku_longFilename_E01_run1.jsonl",
+                     "expF_haiku_longCountline_E01_run1.jsonl", "expFctl_haiku_long_E01_run1.jsonl"]
+    for stem in ("expA_haiku_long", "expFctl_haiku_long", "expF_haiku_longCountline"):
+        with (env.res / f"{stem}_runs.csv").open(encoding="utf-8", newline="") as f:
+            assert [(r["task"], r["run"]) for r in csv.DictReader(f)] == [("E01", "1")]
+
+
+def test_probe_file_names_for_expF_and_expFctl(env):
+    assert env.run("--experiment", "expF", "--tasks", "E01", "--runs", "1", "--yes", "--config-name", "long", "--tool-output-variant", "countline") == batch.EXIT_OK
+    assert (env.out / "probe_haiku_expF-longCountline_inv1_start.jsonl").exists()
+    assert env.run("--experiment", "expFctl", "--tasks", "E01", "--runs", "1", "--yes", "--config-name", "long") == batch.EXIT_OK
+    assert (env.out / "probe_haiku_expFctl-long_inv1_start.jsonl").exists()

@@ -12,6 +12,7 @@
 1. Python 3.12, `py -3.12 -m venv .venv`, `pip install -r requirements.txt`
 2. 인증: `claude login` 또는 `ANTHROPIC_API_KEY` (둘 중 하나만)
 3. `python -m src.agent.smoke`
+4. 실험 비교표 `python -m src.eval.exp_compare --exp A~F`, 그래프 `python -m src.eval.plots`(results/figures, 로그만 읽는다)
 
 ## 한계
 

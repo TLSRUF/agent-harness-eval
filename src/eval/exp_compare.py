@@ -49,6 +49,13 @@ PREFIXES_E = {"long": "expA_haiku_long", "long_filename": "expE_haiku_longFilena
 PROBE_NAMES_E = {"long": "expA-long", "long_filename": "expE-longFilename"}
 SECTION_TITLES_E = ["## 1. long vs long + 파일 이름 출력 (같은 (과제, run) 쌍만)", "## 2. 과제별 통과 횟수 (3회 중)", "## 3. 한도와 배치별 비용"]
 ROWS_E = ["성공률", "실패 유형", "file_stats 선택률", "평균 도구 호출 수", "평균 모델 응답 수", "실행당 평균 비용"]
+# 실험 F(출력 변형): 기준 = expFctl(변형 없는 long), 비교 = long + search_text 출력 맨 앞에 전체 일치 줄 수. 두 조건은 같은 시기에 연달아 실행한다
+COLUMNS_F = ["long", "long_countline"]
+PREFIXES_F = {"long": "expFctl_haiku_long", "long_countline": "expF_haiku_longCountline"}
+PROBE_NAMES_F = {"long": "expFctl-long", "long_countline": "expF-longCountline"}
+SECTION_TITLES_F = ["## 1. long(expFctl) vs long + 일치 개수 출력(expF) (같은 (과제, run) 쌍만)",
+                    "## 2. 과제별 통과 횟수와 Grep count 모드 사용 횟수 (5회 중)", "## 3. 한도와 배치별 비용"]
+ROWS_F = ["성공률", "실패 유형", "search_text 선택률", "Grep 사용률", "Grep count 모드 사용률", "평균 모델 응답 수", "평균 도구 호출 수", "실행당 평균 비용"]
 SECTION_TITLES_D = ["## 1. haiku vs sonnet (같은 (과제, run) 쌍만)", "## 2. 한도와 배치별 비용"]
 ROWS_D = ["성공률", "error_max_turns 건수", "평균 모델 응답 수", "평균 도구 호출 수", "실행당 평균 비용", "search_text 선택률", "Grep 사용률",
           "file_stats 선택률", "Read 사용률", "일관성 (a) 도구 순서", "일관성 (b) 핵심 인자"]
@@ -115,6 +122,11 @@ class Sel:
         self.label, self.scope, self.used = label, scope, used
 
 
+def _used_grep_count_mode(r: Rec) -> bool:
+    """Grep을 output_mode="count"로 한 번이라도 호출했는가(내장 Grep의 입력만 본다. 커스텀 도구나 다른 내장 도구의 같은 이름 입력은 세지 않는다)."""
+    return any(name == "Grep" and isinstance(inp, dict) and inp.get("output_mode") == "count" for name, inp in r.run.seq)
+
+
 def _selections(tasks: dict[str, loader.Task]) -> dict[str, Sel]:
     def pair_scope(pair):
         return lambda t: pair in getattr(tasks.get(t), "overlap_with", [])
@@ -132,6 +144,7 @@ def _selections(tasks: dict[str, loader.Task]) -> dict[str, Sel]:
         "file_stats 선택률": Sel("file_stats 선택률", pair_scope("file_stats|Read"), lambda r: r.run.used_custom({"file_stats"})),
         "Read 사용률": Sel("Read 사용률", pair_scope("file_stats|Read"), lambda r: r.run.used_builtin({"Read"})),
         "check_result 사용률": Sel("check_result 사용률", lambda t: True, lambda r: r.run.used_custom({"check_result"})),
+        "Grep count 모드 사용률": Sel("Grep count 모드 사용률", pair_scope("search_text|Grep"), _used_grep_count_mode),
         "쌍 과제 합산 커스텀 선택률": Sel("쌍 과제 합산 커스텀 선택률", any_pair, pooled_used),
     }
 
@@ -289,8 +302,8 @@ def _section1(cols, sels, out: _Out, columns=None, rows=None) -> list[str]:
             out.rec("error_max_turns인데 채점 통과", c, k, len(mt), _pct(k, len(mt)), labels[c])
         add("error_max_turns인데 채점 통과", cells, labels, ks)
 
-    for name in ["search_text 선택률", "Grep 사용률", "file_stats 선택률", "Read 사용률", "check_result 사용률"]:
-        if not want(name):
+    for name in ["search_text 선택률", "Grep 사용률", "Grep count 모드 사용률", "file_stats 선택률", "Read 사용률", "check_result 사용률"]:
+        if not want(name) or (name == "Grep count 모드 사용률" and rows is None):      # count 모드 행은 실험 F 전용(다른 실험의 기본 행 목록에는 넣지 않는다)
             continue
         cells, labels, ks = {}, {}, {}
         for c in columns:
@@ -608,6 +621,58 @@ def build_from_dir_e(raw_dir, tasks=None) -> str:
     return build_compare_e(collect(raw_dir, PREFIXES_E), raw_dir, tasks)
 
 
+def _section_f_tasks(sub, ids, out: _Out) -> list[str]:
+    cols = COLUMNS_F
+    L = ["| 과제 | " + " | ".join(f"{c} 통과" for c in cols) + " | " + " | ".join(f"{c} count 모드" for c in cols) + " |", "|---|" + "---|" * (2 * len(cols))]
+    runs = 0
+    for t in ids:
+        passed, used = [], []
+        for c in cols:
+            rs = [r for r in sub[c] if r.task == t]
+            g = [r for r in rs if r.run.passed is not None]
+            k = sum(bool(r.run.passed) for r in g)
+            passed.append(f"{k}/{len(g)}" if g else "n/a")
+            if g:
+                out.rec("과제별 통과 횟수", c, k, len(g), _pct(k, len(g)), report.sample_label({t: len(g)}), task=t)
+            u = sum(_used_grep_count_mode(r) for r in rs)
+            used.append(f"{u}/{len(rs)}" if rs else "n/a")
+            if rs:
+                out.rec("과제별 Grep count 모드 사용 횟수", c, u, len(rs), _pct(u, len(rs)), report.sample_label({t: len(rs)}), task=t)
+            runs = max(runs, len(rs))
+        L.append(f"| {t} | " + " | ".join(passed + used) + " |")
+    L += ["", f"- 칸마다 표본은 과제 1개 x {runs}회뿐이다(총 {runs}건 < {report.MIN_SAMPLE}건). {report.SMALL_SAMPLE_WARNING}. "
+              "count 모드 사용은 Grep을 output_mode=count로 호출한 실행의 수다(사후 관찰용 지표, 인과는 가설)."]
+    return L
+
+
+def build_compare_f(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out | None = None) -> str:
+    """실험 F: expFctl(long) vs expF(long + search_text 출력 맨 앞에 전체 일치 줄 수). 같은 (과제, run) 쌍만 비교하고 범위와 소표본 경고를 맨 위에 적는다."""
+    tasks = tasks or {t.id: t for t in loader.load_all() if not t.is_todo}
+    out = out if out is not None else _Out()
+    sels = _selections(tasks)
+    common = {(r.task, r.n) for r in cols["long"]} & {(r.task, r.n) for r in cols["long_countline"]}
+    sub = {c: [r for r in cols[c] if (r.task, r.n) in common] for c in COLUMNS_F}
+    ids = sorted({t for t, _ in common})
+    head = ["# 실험 F 비교표 (exp_compare)", "",
+            f"- 비교 범위: 같은 (과제, run) 쌍 {len(common)}건, 과제 {len(ids)}개({', '.join(ids)}). "
+            f"expFctl 전체 {len(cols['long'])}건 중 {len(common)}건, expF 전체 {len(cols['long_countline'])}건 중 {len(common)}건을 비교한다(나머지는 제외).",
+            f"- ⚠ {report.SMALL_SAMPLE_WARNING}: 비교 쌍 {len(common)}건은 {report.MIN_SAMPLE}건 미만이다. 과제별 칸은 과제 1개 x 반복 횟수뿐이다.",
+            "- 열 이름: long = expFctl(변형 없는 long 설정, 비교 기준), long_countline = 같은 long 설정 + search_text 출력 맨 앞에 "
+            "`total matches: <전체 일치 줄 수>` 한 줄(MAX_RESULTS 50으로 잘리기 전의 개수). 도구 설명 long, 프롬프트 v1, max_turns 20, haiku로 같다.",
+            "- 두 조건은 같은 시기에 연달아 실행한다(시기 효과를 줄이려는 설계이며 완전히 없애지는 못한다. 실행 순서와 그 사이 사용량 변동의 영향은 확인 불가).",
+            "- 실패 유형은 채점기가 기록한 failure_type 그대로다."]
+    out.rec("비교 범위(쌍 수)", "long-long_countline", len(common), None, len(common), ", ".join(ids))
+    bodies = [_section1(sub, sels, out, COLUMNS_F, ROWS_F), _section_f_tasks(sub, ids, out), _section5(cols, raw_dir, out, COLUMNS_F, PROBE_NAMES_F)]
+    lines = head + [""]
+    for title, body in zip(SECTION_TITLES_F, bodies):
+        lines += [title, ""] + body + [""]
+    return "\n".join(lines)
+
+
+def build_from_dir_f(raw_dir, tasks=None) -> str:
+    return build_compare_f(collect(raw_dir, PREFIXES_F), raw_dir, tasks)
+
+
 def build_compare_b(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out | None = None) -> str:
     """실험 B(검증 지시) 비교표: default, verify, verify_tool. 지표는 ROWS_B."""
     tasks = tasks or {t.id: t for t in loader.load_all() if not t.is_todo}
@@ -743,8 +808,8 @@ def build_from_dir(raw_dir, tasks=None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="실험 비교표(읽기 전용, 모델 호출 없음)")
-    ap.add_argument("--exp", choices=["A", "B", "C", "D", "E"], default="A",
-                    help="A: default/short/long/long_directive, B: default/verify/verify_tool, C: default/max_turns 3,4,5,7, D: haiku vs sonnet, E: long vs long + 파일 이름 출력")
+    ap.add_argument("--exp", choices=["A", "B", "C", "D", "E", "F"], default="A",
+                    help="A: default/short/long/long_directive, B: default/verify/verify_tool, C: default/max_turns 3,4,5,7, D: haiku vs sonnet, E: long vs long + 파일 이름 출력, F: expFctl(long) vs long + 일치 개수 출력")
     ap.add_argument("--raw-dir", default="results/raw")
     ap.add_argument("--out-md", default=None)
     ap.add_argument("--out-csv", default=None)
@@ -753,10 +818,10 @@ def main(argv: list[str] | None = None) -> int:
         a.out_md = f"results/exp{a.exp}_haiku_compare_summary_inv1.md"
     if a.out_csv is None:
         a.out_csv = f"results/exp{a.exp}_haiku_compare_runs.csv"
-    prefixes = {"A": PREFIXES, "B": PREFIXES_B, "C": PREFIXES_C, "D": PREFIXES_D, "E": PREFIXES_E}[a.exp]
-    builder = {"A": build_compare, "B": build_compare_b, "C": build_compare_c, "D": build_compare_d, "E": build_compare_e}[a.exp]
+    prefixes = {"A": PREFIXES, "B": PREFIXES_B, "C": PREFIXES_C, "D": PREFIXES_D, "E": PREFIXES_E, "F": PREFIXES_F}[a.exp]
+    builder = {"A": build_compare, "B": build_compare_b, "C": build_compare_c, "D": build_compare_d, "E": build_compare_e, "F": build_compare_f}[a.exp]
     cols = collect(a.raw_dir, prefixes)
-    baseline_keys = {"A": set(), "B": {"default"}, "C": {"default"}, "D": {"haiku"}, "E": {"long"}}[a.exp]
+    baseline_keys = {"A": set(), "B": {"default"}, "C": {"default"}, "D": {"haiku"}, "E": {"long"}, "F": {"long"}}[a.exp]
     if not any(v for k, v in cols.items() if k not in baseline_keys):
         print("읽을 로그가 없다" if a.exp == "A" else f"실험 {a.exp} 로그가 없다(baseline만 있거나 비어 있음)", file=sys.stderr)
         return 1

@@ -55,10 +55,15 @@ CONFIGS: dict[str, Callable[[], HarnessConfig]] = {
     "maxTurns7": lambda: HarnessConfig(max_turns=7),
     # 실험 E는 long 설정 위에서 file_stats 출력만 바꾼다(비교 기준은 expA의 long)
     "longFilename": lambda: ExperimentConfig(tool_desc_version="long", tool_output_variant="filename"),
+    # 실험 F는 long 설정 위에서 search_text 출력만 바꾼다(변형 없는 대조군은 expFctl 이름의 평범한 long)
+    "longCountline": lambda: ExperimentConfig(tool_desc_version="long", tool_output_variant="countline"),
+    "longFilenameCountline": lambda: ExperimentConfig(tool_desc_version="long", tool_output_variant="filename+countline"),
 }
+OUTPUT_VARIANT_CONFIGS = {"filename": "longFilename", "countline": "longCountline", "filename+countline": "longFilenameCountline"}  # 출력 변형 -> 설정 이름
 ALLOWED_MAX_TURNS = (3, 4, 5, 7)                          # 실험 C 후보(응답 수 분포 기준, plan.md)
 ALLOWED_MODELS = (DEFAULT_MODEL, COMPARE_MODEL)           # 실험 D: haiku(기본), sonnet
-CONFIG_ALIASES = {"long_directive": "longDirective", "verify_tool": "verifyTool", "long_filename": "longFilename"}  # 밑줄 이름은 파일명용 이름으로 바꿔 받는다
+CONFIG_ALIASES = {"long_directive": "longDirective", "verify_tool": "verifyTool", "long_filename": "longFilename",
+                  "long_countline": "longCountline", "long_filename_countline": "longFilenameCountline"}  # 밑줄 이름은 파일명용 이름으로 바꿔 받는다
 RUN_FILE_RE = re.compile(r"^(?P<exp>[A-Za-z0-9]+)_(?P<model>[a-z]+)_(?P<cfg>[A-Za-z0-9]+)_(?P<task>[EMH]\d{2})_run(?P<n>\d+)\.jsonl$")
 NAME_RE = re.compile(r"^[A-Za-z0-9]+$")
 LIMIT_RE = re.compile(r"rate.?limit|usage limit|limit (reached|exceeded)|hit your .{0,20}limit|quota|overloaded|\b429\b|\b529\b|credit balance", re.I)
@@ -133,7 +138,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--max-turns", dest="max_turns", type=int, default=None,
                     help="실험 C: 최대 턴 수(3, 4, 5, 7만). 설정 이름(파일 라벨)은 maxTurnsN. config 기본값 20은 바꾸지 않는다(베이스라인이 20)")
     ap.add_argument("--tool-output-variant", dest="tool_output_variant", default=None,
-                    help="실험 E: file_stats 출력 변형(default, filename). filename은 --config-name long과 함께만 쓴다(설정 이름은 longFilename). 다른 변수와 같이 바꿀 수 없다")
+                    help="실험 E, F: 출력 변형(default, filename, countline, filename+countline). filename은 file_stats 출력 앞에 path 줄, countline은 search_text 출력 앞에 total matches 줄. "
+                         "--config-name long과 함께만 쓴다(설정 이름은 longFilename, longCountline, longFilenameCountline). 다른 변수와 같이 바꿀 수 없다")
     ap.add_argument("--model", dest="model", default=None,
                     help="실험 D: claude-haiku-5-5(기본) 또는 claude-sonnet-5-5만. sonnet이면 파일 이름의 모델 자리가 sonnet이 된다. 다른 변수와 같이 바꿀 수 없다")
     ap.add_argument("--out-dir", default=str(runner_agent.RAW_DIR), help="jsonl과 스냅샷을 둘 폴더(기본 results/raw)")
@@ -156,16 +162,17 @@ def resolve_variant(a: argparse.Namespace) -> None:
     tov = a.tool_output_variant
     if tov is not None and tov not in OUTPUT_VARIANTS:
         raise ValueError(f"알 수 없는 --tool-output-variant: {tov} (사용 가능: {list(OUTPUT_VARIANTS)})")
-    if tov == "filename":
-        if a.prompt_version or a.max_turns is not None or a.config not in ("long", "longFilename"):
-            raise ValueError("--tool-output-variant filename은 --config-name long과 함께만 쓴다(도구 설명 long 위에서 출력만 바꾼다). "
+    if tov in OUTPUT_VARIANT_CONFIGS:
+        label = OUTPUT_VARIANT_CONFIGS[tov]
+        if a.prompt_version or a.max_turns is not None or a.config not in ("long", label):
+            raise ValueError(f"--tool-output-variant {tov}은 --config-name long과 함께만 쓴다(도구 설명 long 위에서 출력만 바꾼다). "
                              "프롬프트, max_turns, 다른 도구 설명과는 같이 바꿀 수 없다")
         if a.model is not None and a.model != DEFAULT_MODEL:
-            raise ValueError("--model은 다른 변수와 같이 바꿀 수 없다(--tool-output-variant filename)")
-        a.config = "longFilename"
+            raise ValueError(f"--model은 다른 변수와 같이 바꿀 수 없다(--tool-output-variant {tov})")
+        a.config = label
         return
-    if tov == "default" and a.config == "longFilename":
-        raise ValueError("--config-name longFilename과 --tool-output-variant default는 서로 다른 변형이다")
+    if a.config in OUTPUT_VARIANT_CONFIGS.values() and tov is not None:      # 설정 이름이 이미 정한 변형과 다른 --tool-output-variant(default 포함)는 거부
+        raise ValueError(f"--config-name {a.config}과 --tool-output-variant {tov}는 서로 다른 변형이다")
     requested: list[tuple[str, str]] = []
     if a.prompt_version:
         pv = a.prompt_version

@@ -5,7 +5,7 @@ from typing import Any
 from claude_agent_sdk import HookMatcher, create_sdk_mcp_server, tool
 
 from .sandbox import SandboxError, check_builtin_tool_input, resolve_in_sandbox
-from .tool_outputs import apply_file_stats_output, validate_output_variant
+from .tool_outputs import apply_file_stats_output, apply_search_text_output, validate_output_variant, variant_parts
 from .tool_variants import VARIANT_DESCRIPTIONS
 
 SERVER_NAME = "t"
@@ -73,25 +73,37 @@ def _read_text(p: Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace")
 
 
+def _iter_hits(root: Path, query: str, path: str):
+    """일치한 줄을 'path:line:text' 문자열로 차례대로 내놓는다(자르지 않는다). search_text_impl과 개수 세기가 같은 순회를 쓴다."""
+    base = resolve_in_sandbox(root, path)
+    files = [base] if base.is_file() else sorted(f for f in base.rglob("*") if f.is_file())
+    root_real = Path(root).resolve()
+    for f in files:
+        try:
+            f_real = resolve_in_sandbox(root, str(f))  # 링크로 밖을 가리키는 파일 제외
+            text = _read_text(f_real)
+        except (SandboxError, ValueError, OSError):
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            if query in line:
+                yield f"{f_real.relative_to(root_real).as_posix()}:{n}:{line.strip()}"
+
+
+def count_search_matches(root: Path, query: str, path: str = ".") -> int:
+    """MAX_RESULTS로 자르기 전의 전체 일치 줄 수(실험 F의 countline). 오류 조건은 search_text_impl이 먼저 걸러 이 함수 전에 처리된다."""
+    return sum(1 for _ in _iter_hits(root, query, path))
+
+
 def search_text_impl(root: Path, query: str, path: str = ".") -> dict[str, Any]:
     try:
-        base = resolve_in_sandbox(root, path)
         if not query:
+            resolve_in_sandbox(root, path)                      # 경로 오류(샌드박스 밖)가 빈 query 오류보다 먼저 나오는 기존 순서를 유지
             return _err("query must not be empty")
-        files = [base] if base.is_file() else sorted(f for f in base.rglob("*") if f.is_file())
         hits: list[str] = []
-        root_real = Path(root).resolve()
-        for f in files:
-            try:
-                f_real = resolve_in_sandbox(root, str(f))  # 링크로 밖을 가리키는 파일 제외
-                text = _read_text(f_real)
-            except (SandboxError, ValueError, OSError):
-                continue
-            for n, line in enumerate(text.splitlines(), 1):
-                if query in line:
-                    hits.append(f"{f_real.relative_to(root_real).as_posix()}:{n}:{line.strip()}")
-                    if len(hits) >= MAX_RESULTS:
-                        return _ok("\n".join(hits) + f"\n(truncated at {MAX_RESULTS})")
+        for hit in _iter_hits(root, query, path):
+            hits.append(hit)
+            if len(hits) >= MAX_RESULTS:
+                return _ok("\n".join(hits) + f"\n(truncated at {MAX_RESULTS})")
         return _ok("\n".join(hits) if hits else "no matches")
     except SandboxError as e:
         return _err(f"access denied: {e}")
@@ -131,14 +143,18 @@ def check_result_impl(root: Path, path: str, contains: str = "", min_lines: int 
 
 
 def build_server(root: str | Path, desc_version: str = "default", output_variant: str = "default"):
-    """root에 묶인 SDK MCP 서버를 만든다. output_variant(실험 E)는 file_stats 성공 출력만 바꾸고 기본은 현재 출력 그대로다."""
+    """root에 묶인 SDK MCP 서버를 만든다. output_variant(실험 E, F)는 file_stats, search_text 성공 출력만 바꾸고 기본은 현재 출력 그대로다."""
     validate_output_variant(output_variant)
     root = Path(root).resolve()
     d = DESCRIPTIONS[desc_version] if desc_version in DESCRIPTIONS else VARIANT_DESCRIPTIONS[desc_version]
 
     @tool("search_text", d["search_text"], SCHEMAS["search_text"])
     async def search_text(args: dict[str, Any]) -> dict[str, Any]:
-        return search_text_impl(root, args.get("query", ""), args.get("path") or ".")
+        query, path = args.get("query", ""), args.get("path") or "."
+        result = search_text_impl(root, query, path)
+        if "countline" in variant_parts(output_variant) and result.get("is_error") is not True:
+            result = apply_search_text_output(output_variant, count_search_matches(root, query, path), result)
+        return result
 
     @tool("file_stats", d["file_stats"], SCHEMAS["file_stats"])
     async def file_stats(args: dict[str, Any]) -> dict[str, Any]:
