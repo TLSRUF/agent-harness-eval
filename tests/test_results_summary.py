@@ -25,7 +25,7 @@ def _lines(n, with_total=None):
     return f"total matches: {with_total}\n{body}" if with_total is not None else body
 
 
-def mk(d: Path, prefix, task, run, calls=(), *, passed=True, failure_type=None, subtype="success", cost=0.002, final=True):
+def mk(d: Path, prefix, task, run, calls=(), *, passed=True, failure_type=None, subtype="success", cost=0.002, final=True, ts=None, err=()):
     """calls: (이름, 입력 dict, 결과 텍스트 또는 None) 목록. 호출마다 응답 하나."""
     rows = [{"kind": "config", "task_id": task, "config": {"model": "claude-haiku-5-5", "max_turns": 20, "tool_desc_version": "long"}},
             {"kind": "message", "message": {"_type": "SystemMessage", "subtype": "init",
@@ -36,12 +36,12 @@ def mk(d: Path, prefix, task, run, calls=(), *, passed=True, failure_type=None, 
         if res is not None:
             content = [{"type": "text", "text": res}] if name.startswith("mcp__") else res
             rows.append({"kind": "message", "message": {"_type": "UserMessage", "content": [
-                {"_type": "ToolResultBlock", "tool_use_id": f"t{i}", "content": content, "is_error": False}]}})
+                {"_type": "ToolResultBlock", "tool_use_id": f"t{i}", "content": content, "is_error": i in err}]}})
     if final:
         rows.append({"kind": "message", "message": {"_type": "AssistantMessage", "message_id": "mf", "content": [{"_type": "TextBlock", "text": "done"}]}})
     rows.append({"kind": "summary", "subtype": subtype, "is_error": subtype != "success", "num_turns": len(calls) + 1, "total_cost_usd": cost,
                  "usage": {"input_tokens": 10, "cache_creation_input_tokens": 100, "cache_read_input_tokens": 1000}, "exception": None,
-                 "graded": {"passed": passed, "failure_type": "pass" if passed else (failure_type or "wrong_value")}})
+                 "graded": {"passed": passed, "failure_type": "pass" if passed else (failure_type or "wrong_value")}, **({"ts": ts} if ts else {})})
     (d / f"{prefix}_{task}_run{run}.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
 
 
@@ -383,3 +383,207 @@ def test_agent_value_is_the_last_integer_of_the_last_write_to_the_output_file(tm
              ("Write", {"file_path": "x" + chr(92) + "result.txt", "content": "dev-017 줄 수: 23\n"}, "ok")]
     assert rs.agent_value(calls, TASKS["M01"]) == 23
     assert rs.agent_value([], TASKS["M01"]) is None
+
+
+# ---------------- 실험 E: 주 비교(expEctl 대 expE)와 보조 비교(expA long) ----------------
+
+E_PRE = {"ctl": "expEctl_haiku_long", "var": "expE_haiku_longFilename", "a_long": "expA_haiku_long"}
+E_TIME = "expEctl과 expE는 2026-11-15에 2분 간격으로 연달아 실행, expA long은 2026-11-12 실행(3일 전)"
+
+
+def fill_e(d):
+    for r in (1, 2, 3):
+        mk(d, E_PRE["a_long"], "H01", r, [], passed=False, ts="2026-11-12T03:30:00.000+00:00")
+        mk(d, E_PRE["var"], "H01", r, [], passed=True, ts="2026-11-15T06:09:12.000+00:00")
+        mk(d, E_PRE["ctl"], "H01", r, [], passed=(r == 3), ts="2026-11-15T06:11:30.000+00:00")
+    for t in ("E03", "E10"):                                                    # expE와 expA long에만 있는 과제(보조 비교에만 들어간다)
+        for r in (1, 2, 3):
+            mk(d, E_PRE["a_long"], t, r, [], passed=True, ts="2026-11-12T03:30:00.000+00:00")
+            mk(d, E_PRE["var"], t, r, [], passed=True, ts="2026-11-15T06:09:12.000+00:00")
+
+
+def _section_text(text, e):
+    nxt = {"A": "B", "B": "C", "C": "D", "D": "E", "E": "F"}.get(e)
+    a = text.index(f"## 실험 {e}")
+    return text[a:text.index(f"## 실험 {nxt}", a) if nxt and f"## 실험 {nxt}" in text else len(text)]
+
+
+def test_e_core_table_is_expEctl_vs_expE_with_h01_only_and_time_note(tmp_path):
+    fill_e(tmp_path)
+    sec = _section_text(rs.build(tmp_path, TASKS), "E")
+    core = sec[sec.index("### 핵심 지표"):sec.index("### 해석")]
+    first_table = core[:core.index("**")] if "**" in core else core
+    assert "| 지표 | expEctl | long_filename | 표본 |" in first_table
+    assert "33% (1/3)" in first_table and "100% (3/3)" in first_table
+    assert "N=1, 과제당 3회" in first_table and "총 3건" in first_table
+    assert E_TIME in sec
+    assert "H01 한 과제" in sec
+
+
+def test_e_expA_long_comparison_is_demoted_to_an_auxiliary_table(tmp_path):
+    fill_e(tmp_path)
+    sec = _section_text(rs.build(tmp_path, TASKS), "E")
+    core = sec[sec.index("### 핵심 지표"):sec.index("### 해석")]
+    assert "**보조: expA long vs expE" in core
+    aux = core[core.index("**보조: expA long vs expE"):]
+    assert "| 지표 | long | long_filename | 표본 |" in aux
+    assert core.index("| 지표 | expEctl | long_filename | 표본 |") < core.index("**보조: expA long vs expE")
+    assert "67% (6/9)" in aux                                   # expA long H01 0/3 + E03 3/3 + E10 3/3 = 6/9
+
+
+def test_e_section_limits_name_the_same_day_control_and_the_time_gap(tmp_path):
+    fill_e(tmp_path)
+    sec = _section_text(rs.build(tmp_path, TASKS), "E")
+    lim = sec[sec.index("### 한계"):]
+    assert "H01 한 과제" in lim and "3회" in lim and "30건 미만" in lim
+    assert "3일" in lim or "다른 시기" in lim
+
+
+# ---------------- 실험 C: 제한에 걸렸지만 통과한 실행의 쓰기 시점 ----------------
+
+C_PRE = ec.PREFIXES_C
+CHECK = "mcp__t__check_result"
+
+
+def fill_cut(d):
+    mt = dict(subtype="error_max_turns", final=False)
+    # max_turns 3: 쓰기 직후 1, 쓰기 뒤 check_result 1, H05 Edit 뒤 Grep 1, 쓰기 기록 없음 2(하나는 쓰기가 오류 결과), 걸렸지만 실패 1, 정상 종료 1
+    mk(d, C_PRE["3"], "E01", 1, [("Grep", {}, "x"), write_call("E01", 4)], **mt)
+    mk(d, C_PRE["3"], "E01", 2, [("Grep", {}, "x"), write_call("E01", 4), (CHECK, {}, "ok")], **mt)
+    mk(d, C_PRE["3"], "H05", 1, [("Glob", {}, "x"), ("Edit", {"file_path": "a"}, "ok"), ("Edit", {"file_path": "b"}, "ok"), ("Grep", {}, "x")], **mt)
+    mk(d, C_PRE["3"], "E02", 1, [("Grep", {}, "x")], **mt)
+    mk(d, C_PRE["3"], "E02", 2, [("Grep", {}, "x"), write_call("E01", 4)], err=(1,), **mt)
+    mk(d, C_PRE["3"], "E03", 1, [("Grep", {}, "x")], passed=False, **mt)
+    mk(d, C_PRE["3"], "E03", 2, [("Grep", {}, "x"), write_call("E01", 4)])
+    mk(d, C_PRE["4"], "E01", 1, [write_call("E01", 4)], **mt)
+    mk(d, C_PRE["5"], "E01", 1, [write_call("E01", 4)])
+    mk(d, C_PRE["7"], "E01", 1, [write_call("E01", 4)])
+
+
+def test_cut_pass_stats_classify_each_cut_but_passed_run_by_write_timing(tmp_path):
+    fill_cut(tmp_path)
+    s = rs.cut_pass_stats(tmp_path)
+    assert list(s) == ["3", "4", "5", "7"]
+    s3 = s["3"]
+    assert (s3["cut"], s3["cut_pass"], s3["write_before_cut"], s3["no_write"]) == (6, 5, 3, 2)
+    assert (s3["right_after_write"], s3["after_write"]) == (1, 2)
+    assert s3["after_names"] == {CHECK: 1, "Grep": 1}
+    assert s3["after_tasks"]["Grep"] == {"H05"} and s3["after_tasks"][CHECK] == {"E01"}
+    s4 = s["4"]
+    assert (s4["cut"], s4["cut_pass"], s4["write_before_cut"], s4["no_write"], s4["right_after_write"], s4["after_write"]) == (1, 1, 1, 0, 1, 0)
+    for k in ("5", "7"):
+        assert (s[k]["cut"], s[k]["cut_pass"], s[k]["write_before_cut"], s[k]["no_write"]) == (0, 0, 0, 0)
+
+
+def test_failed_write_result_does_not_count_as_a_write(tmp_path):
+    mk(tmp_path, C_PRE["3"], "E02", 2, [("Grep", {}, "x"), write_call("E01", 4)], err=(1,), subtype="error_max_turns", final=False)
+    s = rs.cut_pass_stats(tmp_path)["3"]
+    assert (s["cut_pass"], s["write_before_cut"], s["no_write"]) == (1, 0, 1)
+
+
+def test_cut_pass_stats_with_no_logs_is_all_zero_not_crashing(tmp_path):
+    s = rs.cut_pass_stats(tmp_path)
+    assert all(v["cut"] == 0 and v["cut_pass"] == 0 and v["no_write"] == 0 for v in s.values())
+    obs, hyp = rs.render_cut_summary(s)
+    assert "없음" in obs and "직접 증거" in hyp
+
+
+def _stats(total_by, right_by, after_by, names=None, tasks=None, no_write=0):
+    out = {}
+    for k in ("3", "4", "5", "7"):
+        t, r, a = total_by.get(k, 0), right_by.get(k, 0), after_by.get(k, 0)
+        out[k] = {"cut": t, "cut_pass": t, "write_before_cut": r + a, "no_write": no_write if k == "3" else 0,
+                  "right_after_write": r, "after_write": a, "max_after": 1 if a else 0,
+                  "after_names": dict(names or {}) if k == "3" else {}, "after_tasks": dict(tasks or {}) if k == "3" else {}}
+    return out
+
+
+def test_summary_sentence_has_all_counts_and_the_not_evidence_hypothesis():
+    s = _stats({"3": 71, "4": 29, "5": 8}, {"3": 44, "4": 3, "5": 1}, {"3": 27, "4": 26, "5": 7}, names={CHECK: 3, "Grep": 1}, tasks={"Grep": {"H05"}, CHECK: {"E01"}})
+    s["3"]["write_before_cut"], s["4"]["write_before_cut"], s["5"]["write_before_cut"] = 71, 29, 8
+    obs, hyp = rs.render_cut_summary(s)
+    assert obs.startswith("error_max_turns인데 통과한 108건(max_turns 3: 71, 4: 29, 5: 8)은 모두 결과 파일 쓰기가 성공한 뒤에 잘렸다.")
+    assert "쓰기 직후에 잘린 것은 48건(44, 3, 1)이고" in obs
+    assert "60건(27, 26, 7)은 쓰기 뒤에 도구가 한 번 더 호출됐다" in obs
+    assert "check_result 3건" in obs and "Grep 1건" in obs and "H05" in obs
+    assert hyp == "마무리 응답에서 잘렸다는 직접 증거는 없다(가설)."
+
+
+def test_summary_sentence_does_not_say_all_when_there_are_exceptions():
+    s = _stats({"3": 5, "4": 1}, {"3": 1, "4": 1}, {"3": 2}, names={CHECK: 2}, tasks={CHECK: {"E01"}}, no_write=2)
+    obs, _ = rs.render_cut_summary(s)
+    assert "모두 결과 파일 쓰기가 성공한 뒤에 잘렸다" not in obs
+    assert "쓰기 성공 기록이 없다" in obs and "2건" in obs
+    assert "(max_turns 3: 5, 4: 1)" in obs                                           # 걸린 설정만 적는다(5, 7은 0건이라 뺀다)
+
+
+def test_section_c_uses_the_generated_sentence_and_drops_the_old_causal_claim(tmp_path):
+    fill_all_experiments(tmp_path)
+    fill_cut(tmp_path)
+    sec = _section_text(rs.build(tmp_path, TASKS), "C")
+    assert "- 관찰: error_max_turns인데 통과한 6건(max_turns 3: 5, 4: 1)" in sec
+    assert "- 가설: 마무리 응답에서 잘렸다는 직접 증거는 없다(가설)." in sec
+    assert "써 두기 때문이다" not in sec
+    table = sec[sec.index("**제한에 걸렸지만 통과한 실행의 쓰기 시점"):]
+    row3 = next(ln for ln in table.splitlines() if ln.startswith("| 3 |"))
+    assert [c.strip() for c in row3.strip().strip("|").split("|")] == ["3", "6", "5", "3", "1", "2", "2"]
+
+
+def test_cut_table_rows_have_the_same_cell_count_as_header(tmp_path):
+    fill_all_experiments(tmp_path)
+    fill_cut(tmp_path)
+    sec = _section_text(rs.build(tmp_path, TASKS), "C")
+    table = sec[sec.index("**제한에 걸렸지만 통과한 실행의 쓰기 시점"):]
+    rows = [ln for ln in table.splitlines() if ln.startswith("|")]
+    assert len(rows) == 2 + 4 and len({len(r.strip().strip("|").split("|")) for r in rows}) == 1
+
+
+# ---------------- 문서 표현 정정(마무리 응답에서 잘렸다는 단정 제거) ----------------
+
+KO_DOCS = ["README.md", "docs/sdk_notes.md", "docs/failure_analysis.md"]
+CUT_KO = ("error_max_turns인데 통과한 108건(max_turns 3: 71, 4: 29, 5: 8)은 모두 결과 파일 쓰기가 성공한 뒤에 잘렸다. "
+          "쓰기 직후에 잘린 것은 48건(44, 3, 1)이고, 60건(27, 26, 7)은 쓰기 뒤에 도구가 한 번 더 호출됐다(대부분 check_result, H05는 Edit 뒤 Grep). "
+          "마무리 응답에서 잘렸다는 직접 증거는 없다(가설).")
+CUT_EN = ("Of the 108 runs that ended with error_max_turns yet passed (max_turns 3: 71, 4: 29, 5: 8), all were cut off after the result-file write had succeeded. "
+          "48 (44, 3, 1) were cut right after the write; in 60 (27, 26, 7) one more tool call followed the write (mostly check_result; Grep after an Edit for H05). "
+          "There is no direct evidence that the cut happened in the wrap-up response (hypothesis).")
+
+
+@pytest.mark.parametrize("name", KO_DOCS)
+def test_korean_docs_carry_the_corrected_cut_sentence(name):
+    text = (ROOT / name).read_text(encoding="utf-8")
+    assert CUT_KO in text.replace("\r\n", "\n"), name
+
+
+def test_english_readme_carries_the_corrected_cut_sentence():
+    assert CUT_EN in (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("name", KO_DOCS + ["README.en.md", "docs/results.md"])
+def test_no_doc_states_the_wrapup_cut_as_fact(name):
+    for ln in (ROOT / name).read_text(encoding="utf-8").splitlines():
+        if "마무리 응답" in ln or "wrap-up" in ln.lower():
+            assert "직접 증거" in ln or "direct evidence" in ln, (name, ln[:160])
+        assert "쓴 뒤였다" not in ln and "had already written" not in ln and "써 두기 때문이다" not in ln, (name, ln[:160])
+
+
+def _real_c_logs():
+    raw = ROOT / "results" / "raw"
+    return raw if any(raw.glob("expC_haiku_maxTurns3_*_run1.jsonl")) else None
+
+
+def test_corrected_numbers_match_the_real_logs_when_present():
+    raw = _real_c_logs()
+    if raw is None:
+        pytest.skip("results/raw의 실험 C 로그가 없다(gitignore 대상)")
+    s = rs.cut_pass_stats(raw)
+    assert [s[k]["cut_pass"] for k in ("3", "4", "5")] == [71, 29, 8]
+    assert all(s[k]["no_write"] == 0 for k in s)
+    assert [s[k]["right_after_write"] for k in ("3", "4", "5")] == [44, 3, 1]
+    assert [s[k]["after_write"] for k in ("3", "4", "5")] == [27, 26, 7]
+    names = {}
+    for k in s:
+        for n, c in s[k]["after_names"].items():
+            names[n.split("__")[-1]] = names.get(n.split("__")[-1], 0) + c
+    assert max(names, key=names.get) == "check_result" and names.get("Grep") == 2
+    assert {t for k in s for t in s[k]["after_tasks"].get("Grep", set())} == {"H05"}

@@ -180,6 +180,107 @@ def render_failures(rows) -> list[str]:
     return L
 
 
+# ---------------- 실험 C: 제한에 걸렸지만 통과한 실행의 쓰기 시점 ----------------
+
+CUT_LABELS = ["3", "4", "5", "7"]
+WRITE_TOOLS = ("Write", "Edit")
+
+
+def _ordered_results(path) -> list[tuple[str, bool]]:
+    """도구 결과가 로그에 나온 순서대로 (도구 이름, 오류 여부)."""
+    pending: dict[str, str] = {}
+    out: list[tuple[str, bool]] = []
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        ev = json.loads(line)
+        if ev.get("kind") != "message":
+            continue
+        m = ev["message"]
+        if m.get("_type") == "AssistantMessage":
+            for b in m.get("content", []):
+                if isinstance(b, dict) and b.get("_type") == "ToolUseBlock":
+                    pending[b["id"]] = b["name"]
+        elif m.get("_type") == "UserMessage" and isinstance(m.get("content"), list):
+            for b in m["content"]:
+                if isinstance(b, dict) and b.get("_type") == "ToolResultBlock":
+                    out.append((pending.get(b.get("tool_use_id"), ""), bool(b.get("is_error"))))
+    return out
+
+
+def cut_pass_stats(raw_dir) -> dict[str, dict]:
+    """실험 C의 max_turns별로, error_max_turns로 끝났지만 채점을 통과한 실행이 결과 파일 쓰기(Write/Edit, 오류 아닌 결과)보다 앞서 잘렸는지 센다.
+    right_after_write = 마지막 성공한 쓰기 결과가 로그의 마지막 도구 결과, after_write = 그 뒤에 도구 결과가 더 있음, no_write = 성공한 쓰기 결과가 없음."""
+    cols = ec.collect(raw_dir, ec.PREFIXES_C)
+    stats: dict[str, dict] = {}
+    for k in CUT_LABELS:
+        st = {"cut": 0, "cut_pass": 0, "write_before_cut": 0, "no_write": 0, "right_after_write": 0, "after_write": 0, "max_after": 0,
+              "after_names": {}, "after_tasks": {}}
+        for r in cols.get(k, []):
+            if r.run.subtype != "error_max_turns":
+                continue
+            st["cut"] += 1
+            if r.run.passed is not True:
+                continue
+            st["cut_pass"] += 1
+            res = _ordered_results(r.run.path)
+            writes = [i for i, (n, err) in enumerate(res) if _short(n) in WRITE_TOOLS and not err]
+            if not writes:
+                st["no_write"] += 1
+                continue
+            st["write_before_cut"] += 1
+            after = res[writes[-1] + 1:]
+            if not after:
+                st["right_after_write"] += 1
+                continue
+            st["after_write"] += 1
+            st["max_after"] = max(st["max_after"], len(after))
+            for n, _ in after:
+                st["after_names"][n] = st["after_names"].get(n, 0) + 1
+                st["after_tasks"].setdefault(n, set()).add(r.task)
+        stats[k] = st
+    return stats
+
+
+def render_cut_summary(stats) -> tuple[str, str]:
+    """(관찰 문장, 가설 문장). 수치는 cut_pass_stats가 로그에서 계산한 값이다."""
+    hyp = "마무리 응답에서 잘렸다는 직접 증거는 없다(가설)."
+    labs = [k for k in CUT_LABELS if stats[k]["cut_pass"] > 0]
+    if not labs:
+        return "error_max_turns인데 통과한 실행 없음(0건).", hyp
+    by = lambda key: ", ".join(str(stats[k][key]) for k in labs)  # noqa: E731
+    total = sum(stats[k]["cut_pass"] for k in labs)
+    nw = sum(stats[k]["no_write"] for k in labs)
+    first = "(max_turns " + ", ".join(f"{k}: {stats[k]['cut_pass']}" for k in labs) + ")"
+    if nw == 0:
+        obs = f"error_max_turns인데 통과한 {total}건{first}은 모두 결과 파일 쓰기가 성공한 뒤에 잘렸다."
+    else:
+        obs = f"error_max_turns인데 통과한 {total}건{first} 중 {total - nw}건은 결과 파일 쓰기가 성공한 뒤에 잘렸고, {nw}건은 쓰기 성공 기록이 없다(예외)."
+    right, after = sum(stats[k]["right_after_write"] for k in labs), sum(stats[k]["after_write"] for k in labs)
+    mx = max(stats[k]["max_after"] for k in labs)
+    names: dict[str, int] = {}
+    tasks: dict[str, set] = {}
+    for k in labs:
+        for n, c in stats[k]["after_names"].items():
+            names[n] = names.get(n, 0) + c
+            tasks.setdefault(n, set()).update(stats[k]["after_tasks"].get(n, set()))
+    detail = ", ".join(f"{_short(n)} {c}건" + ("" if _short(n) == "check_result" else f" [{', '.join(sorted(tasks[n]))}]")
+                       for n, c in sorted(names.items(), key=lambda kv: (-kv[1], kv[0])))
+    more = "한 번 더" if mx <= 1 else f"더(최대 {mx}번)"
+    obs += f" 쓰기 직후에 잘린 것은 {right}건({by('right_after_write')})이고, {after}건({by('after_write')})은 쓰기 뒤에 도구가 {more} 호출됐다" + (f"({detail})" if detail else "") + "."
+    return obs, hyp
+
+
+def render_cut_table(stats) -> list[str]:
+    L = ["| max_turns | 제한에 걸림 | 걸렸지만 통과 | 쓰기 성공 뒤 잘림 | 쓰기 직후 | 쓰기 뒤 도구 추가 호출 | 쓰기 기록 없음(예외) |", "|---|---|---|---|---|---|---|"]
+    for k in CUT_LABELS:
+        x = stats[k]
+        L.append(f"| {k} | {x['cut']} | {x['cut_pass']} | {x['write_before_cut']} | {x['right_after_write']} | {x['after_write']} | {x['no_write']} |")
+    L += ["", "쓰기 성공 = 결과 파일에 대한 Write 또는 Edit 호출의 결과가 오류가 아님. 채점은 실행이 끝난 시점의 파일 상태로 한다. "
+              "마무리 응답에서 잘렸다는 직접 증거는 이 표에 없다(가설)."]
+    return L
+
+
 # ---------------- H01 네 조건 ----------------
 
 def _items(content: str) -> list[str]:
@@ -350,11 +451,13 @@ def section_c(raw_dir, tasks, sels):
     if not _has_logs(cols, ec.COLUMNS_C):
         return _missing(title, q, setting, limits)
     c = ec.COLUMNS_C
+    cut = cut_pass_stats(raw_dir)
+    cut_obs, cut_hyp = render_cut_summary(cut)
     obs = ["정상 종료율(error_max_turns가 아닌 실행) " + ", ".join(f"max_turns {x} {_normal(cols, x)}" for x in c) + ".",
-           "성공률 " + ", ".join(f"max_turns {x} {_pass(cols, x)}" for x in c) + "."]
-    hyp = ["작은 max_turns에서 성공률이 정상 종료율보다 훨씬 높은 것은 에이전트가 한계에 걸리기 전에 이미 결과 파일을 써 두기 때문이다(채점 통과 건수 행 참고).",
-           "한계 판정 규칙은 응답 수 > max_turns일 때 중단(max_turns 3, 4, 5에서 일치, 가설 수준)."]
-    return _section(title, q, setting, _sample_lines(cols, c), _table(cols, c, ROWS_C2, sels), obs, hyp, limits)
+           "성공률 " + ", ".join(f"max_turns {x} {_pass(cols, x)}" for x in c) + ".", cut_obs]
+    hyp = [cut_hyp, "한계 판정 규칙은 응답 수 > max_turns일 때 중단(max_turns 3, 4, 5에서 일치, 가설 수준)."]
+    return _section(title, q, setting, _sample_lines(cols, c), _table(cols, c, ROWS_C2, sels), obs, hyp, limits,
+                    extra=[("제한에 걸렸지만 통과한 실행의 쓰기 시점(max_turns별)", render_cut_table(cut))])
 
 
 def section_d(raw_dir, tasks, sels):
@@ -378,23 +481,29 @@ def section_d(raw_dir, tasks, sels):
 def section_e(raw_dir, tasks, sels):
     cols = ec.collect(raw_dir, ec.PREFIXES_E)
     title, q = "E — file_stats 출력에 파일 이름", "file_stats 출력 앞에 `path: <입력 경로>` 한 줄을 붙이면 file_stats|Read 쌍 과제의 오류(특히 H01 짝 오류)가 줄어드는가?"
-    setting = ["도구 출력만 바꾼다(`--tool-output-variant filename`: file_stats 출력 앞에 입력 경로 한 줄; 도구 이름, 스키마, 설명은 그대로). 도구 설명 long, 프롬프트 v1, max_turns 20, haiku."]
-    limits = ["비교 기준(expA long)과 변형(expE)은 서로 다른 시기에 실행됐고, H01만 같은 시기 대조(expEctl 3회)가 있다.", "과제 8개 x 3회로 30건 미만이다.",
+    setting = ["도구 출력만 바꾼다(`--tool-output-variant filename`: file_stats 출력 앞에 입력 경로 한 줄; 도구 이름, 스키마, 설명은 그대로). 도구 설명 long, 프롬프트 v1, max_turns 20, haiku.",
+               "", "주 비교는 같은 날 연달아 돌린 expEctl(변형 없는 long) 대 expE(long + 파일 이름)이고, 3일 전에 돌린 expA long과의 비교는 보조다.", "", ec.e_time_note(cols)]
+    limits = ["주 비교는 H01 한 과제 x 3회(3건 대 3건, 30건 미만)뿐이다. 과제 하나의 반복이라 다른 과제로 일반화할 수 없다.",
+              "보조 비교의 기준(expA long)은 3일 전에 실행됐다(다른 시기라 시기 효과를 분리하지 못함). 과제 8개 x 3회(24건)로 보조 비교도 30건 미만이다.",
               "H01 실패 원인(이름-값 짝 어긋남)은 실패 출력으로 추정한 것이며 모델 내부 과정은 확인 불가."]
     if not _has_logs(cols, ec.COLUMNS_E):
         return _missing(title, q, setting, limits)
-    c = ec.COLUMNS_E
-    sub, _ = _common_sub(cols, "long", "long_filename", c)
+    c, cm = ec.COLUMNS_E, ec.COLUMNS_E_MAIN
+    sub_a, common_a = _common_sub(cols, "long", "long_filename", c)
+    sub_m, common_m = _common_sub(cols, "expEctl", "long_filename", cm)
     h01 = h01_rows(raw_dir, tasks)
     hm = {r["condition"]: r for r in h01}
-    obs = ["성공률 " + ", ".join(f"{x} {_pass(sub, x)}" for x in c) + ".",
+    obs = ["성공률(주 비교, 같은 (과제, run) 쌍 " + f"{len(common_m)}건) " + ", ".join(f"{x} {_pass(sub_m, x)}" for x in cm) + ".",
+           "성공률(보조 비교, 같은 (과제, run) 쌍 " + f"{len(common_a)}건) " + ", ".join(f"{x} {_pass(sub_a, x)}" for x in c) + ".",
            "H01 통과: " + ", ".join(f"{k} {hm[k]['passed']}/{hm[k]['n']}" for k in H01_LABELS if hm[k]["n"]) + ". 실패한 실행은 모두 이름-값 짝 오류 유형이다."
            if all(hm[k]["pair_errors"] == hm[k]["failures"] for k in H01_LABELS) else
            "H01 통과: " + ", ".join(f"{k} {hm[k]['passed']}/{hm[k]['n']}" for k in H01_LABELS if hm[k]["n"]) + "."]
     hyp = ["H01의 실패는 file_stats 출력에 파일 이름이 없어 Glob 결과의 순서와 통계를 짝지을 때 한 칸 어긋난 것이다(실패 출력이 모두 같은 어긋남이라는 점에서 나온 가설).",
-           "파일 이름 출력이 이를 줄이는지는 미확정: 같은 시기 대조(expEctl)에서도 H01이 일부 통과했다."]
-    return _section(title, q, setting, _sample_lines(sub, c), _table(sub, c, ec.ROWS_E, sels), obs, hyp, limits,
-                    extra=[("H01 네 조건 비교", render_h01(h01))])
+           "주 비교는 H01 한 과제 3쌍뿐이라 파일 이름 출력의 효과는 가설 수준이며, 같은 날 대조(expEctl)에서도 H01이 일부 통과했다."]
+    aux_head = f"보조: expA long vs expE(long_filename), 3일 전 기준(같은 (과제, run) 쌍 {len(common_a)}건)"
+    sample = _sample_lines(sub_m, cm) + _sample_lines(sub_a, c, {"long": "보조 expA long", "long_filename": "보조 expE(long_filename)"})
+    return _section(title, q, setting, sample, _table(sub_m, cm, ec.ROWS_E, sels), obs, hyp, limits,
+                    extra=[(aux_head, _table(sub_a, c, ec.ROWS_E, sels)), ("H01 네 조건 비교", render_h01(h01))])
 
 
 def section_f(raw_dir, tasks, sels):

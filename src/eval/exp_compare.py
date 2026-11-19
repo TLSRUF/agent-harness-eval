@@ -43,11 +43,15 @@ COLUMNS_D = ["haiku", "sonnet"]
 PREFIXES_D = {"haiku": "baseline_haiku_default", "sonnet": "expD_sonnet_default"}
 PROBE_NAMES_D = {"haiku": "baseline-default", "sonnet": "expD-default"}
 PROBE_MODELS_D = {"haiku": "haiku", "sonnet": "sonnet"}
-# 실험 E(출력 변형): 기준 = expA의 long, 비교 = long + file_stats 출력에 파일 이름
+# 실험 E(출력 변형): 주 비교 = 같은 날 연달아 돌린 expEctl(변형 없는 long) 대 expE(long + file_stats 출력에 파일 이름, H01 쌍만).
+# 보조 비교 = 3일 전에 돌린 expA long 대 expE(같은 (과제, run) 쌍 24건). COLUMNS_E는 보조 비교(과 plots.py)의 열이다.
 COLUMNS_E = ["long", "long_filename"]
-PREFIXES_E = {"long": "expA_haiku_long", "long_filename": "expE_haiku_longFilename"}
-PROBE_NAMES_E = {"long": "expA-long", "long_filename": "expE-longFilename"}
-SECTION_TITLES_E = ["## 1. long vs long + 파일 이름 출력 (같은 (과제, run) 쌍만)", "## 2. 과제별 통과 횟수 (3회 중)", "## 3. 한도와 배치별 비용"]
+COLUMNS_E_MAIN = ["expEctl", "long_filename"]
+PREFIXES_E = {"long": "expA_haiku_long", "long_filename": "expE_haiku_longFilename", "expEctl": "expEctl_haiku_long"}
+PROBE_NAMES_E = {"long": "expA-long", "long_filename": "expE-longFilename", "expEctl": "expEctl-long"}
+SECTION_TITLES_E = ["## 1. 주 비교: expEctl(long) vs expE(long_filename), 같은 날 연달아 실행 (H01 한 과제 3회뿐)",
+                    "## 2. 보조 비교: expA long vs expE(long_filename), 3일 전 기준 (같은 (과제, run) 쌍만)",
+                    "## 3. 과제별 통과 횟수 (3회 중, 보조 비교 기준)", "## 4. 한도와 배치별 비용"]
 ROWS_E = ["성공률", "실패 유형", "file_stats 선택률", "평균 도구 호출 수", "평균 모델 응답 수", "실행당 평균 비용"]
 # 실험 F(출력 변형): 기준 = expFctl(변형 없는 long), 비교 = long + search_text 출력 맨 앞에 전체 일치 줄 수. 두 조건은 같은 시기에 연달아 실행한다
 COLUMNS_F = ["long", "long_countline"]
@@ -593,24 +597,83 @@ def _section_pass_by_task(sub, columns, ids, out: _Out) -> list[str]:
     return L
 
 
+def _parse_ts(ts: str):
+    from datetime import datetime
+    return datetime.fromisoformat(ts)
+
+
+def e_time_note(cols: dict[str, list[Rec]]) -> str:
+    """실험 E 조건들의 실행 시기를 로그(summary 시각, UTC)에서 계산한 한 줄. 시각이 없으면 확인 불가로 적는다."""
+    from datetime import date
+    ctl = sorted(r.ts for r in cols.get("expEctl", []) if r.ts)
+    var = sorted(r.ts for r in cols.get("long_filename", []) if r.ts)
+    old = sorted(r.ts for r in cols.get("long", []) if r.ts)
+    if not (ctl and var):
+        return "실행 시기: expEctl과 expE의 실행 시각을 로그에서 읽지 못했다(확인 불가)."
+    d_ctl, d_var = ctl[0][:10], var[0][:10]
+    if d_ctl == d_var:
+        if ctl[0] > var[-1]:
+            gap = (_parse_ts(ctl[0]) - _parse_ts(var[-1])).total_seconds()
+        elif var[0] > ctl[-1]:
+            gap = (_parse_ts(var[0]) - _parse_ts(ctl[-1])).total_seconds()
+        else:
+            gap = None
+        if gap is None:
+            first = f"expEctl과 expE는 {d_var}에 실행(실행 시간대가 겹쳐 간격은 확인 불가)"
+        else:
+            m = round(gap / 60)
+            first = f"expEctl과 expE는 {d_var}에 {f'{m}분' if m else '1분 미만'} 간격으로 연달아 실행"
+    else:
+        first = f"expEctl은 {d_ctl}, expE는 {d_var}에 실행(같은 날이 아님)"
+    if old:
+        n = (date.fromisoformat(d_var) - date.fromisoformat(old[0][:10])).days
+        rel = f"{n}일 전" if n > 0 else "같은 날" if n == 0 else f"{-n}일 후"
+        second = f"expA long은 {old[0][:10]} 실행({rel})"
+    else:
+        second = "expA long의 실행 시각은 확인 불가"
+    return f"실행 시기(로그 시각 기준 UTC 날짜): {first}, {second}"
+
+
+def _aux_records(aux: _Out, out: _Out) -> None:
+    for r in aux.records:
+        out.records.append({**r, "metric": "보조 " + r["metric"]})
+
+
 def build_compare_e(cols: dict[str, list[Rec]], raw_dir=".", tasks=None, out: _Out | None = None) -> str:
-    """실험 E: expA long(기준) vs expE long + file_stats 파일 이름 출력. 같은 (과제, run) 쌍만 비교하고 범위를 맨 위에 적는다."""
+    """실험 E. 주 비교: expEctl(변형 없는 long, 같은 날 연달아 실행) 대 expE(long + file_stats 파일 이름 출력), 같은 (과제, run) 쌍(H01 3쌍).
+    보조 비교: expA long(3일 전) 대 expE, 같은 쌍 24건. 맨 위에 실행 시기(로그에서 계산)와 소표본 경고를 적는다."""
     tasks = tasks or {t.id: t for t in loader.load_all() if not t.is_todo}
     out = out if out is not None else _Out()
+    aux = _Out()
     sels = _selections(tasks)
-    common = {(r.task, r.n) for r in cols["long"]} & {(r.task, r.n) for r in cols["long_filename"]}
-    sub = {c: [r for r in cols[c] if (r.task, r.n) in common] for c in COLUMNS_E}
-    ids = sorted({t for t, _ in common})
+    ctl, var, old = cols.get("expEctl", []), cols["long_filename"], cols["long"]
+    cm = {(r.task, r.n) for r in ctl} & {(r.task, r.n) for r in var}
+    ca = {(r.task, r.n) for r in old} & {(r.task, r.n) for r in var}
+    sub_m = {"expEctl": [r for r in ctl if (r.task, r.n) in cm], "long_filename": [r for r in var if (r.task, r.n) in cm]}
+    sub_a = {c: [r for r in cols[c] if (r.task, r.n) in ca] for c in COLUMNS_E}
+    ids_m, ids_a = sorted({t for t, _ in cm}), sorted({t for t, _ in ca})
+    runs_m = max((sum(1 for t, _ in cm if t == i) for i in ids_m), default=0)
+    who = (f"{ids_m[0]} 한 과제" if len(ids_m) == 1 else f"{len(ids_m)}개 과제") if ids_m else "비교할 과제 없음"
     head = ["# 실험 E 비교표 (exp_compare)", "",
-            f"- 비교 범위: 같은 (과제, run) 쌍 {len(common)}건, 과제 {len(ids)}개({', '.join(ids)}). "
-            f"expA long 전체 {len(cols['long'])}건 중 {len(common)}건, expE 전체 {len(cols['long_filename'])}건 중 {len(common)}건을 비교한다(나머지는 제외).",
-            "- 열 이름: long = expA의 long 설정(비교 기준), long_filename = 같은 long 설정 + file_stats 출력 앞에 `path: <입력 경로>` 한 줄. "
-            "도구 설명 long, 프롬프트 v1, max_turns 20, haiku로 같다.",
-            "- 두 조건은 서로 다른 시기에 실행됐다(시기 효과는 분리하지 못함, 가설 수준으로만 해석).",
+            f"- {e_time_note(cols)}",
+            f"- 주 비교 범위: 같은 (과제, run) 쌍 {len(cm)}건, 과제 {len(ids_m)}개({', '.join(ids_m)}). "
+            f"expEctl 전체 {len(ctl)}건 중 {len(cm)}건, expE 전체 {len(var)}건 중 {len(cm)}건을 비교한다(나머지는 제외).",
+            f"- ⚠ {report.SMALL_SAMPLE_WARNING}: 주 비교는 {who} x {runs_m}회 = {len(cm)}건 대 {len(cm)}건뿐이다({report.MIN_SAMPLE}건 미만). "
+            "과제 하나의 반복이라 과제 사이 일반화는 확인 불가.",
+            f"- 보조 비교 범위: 같은 (과제, run) 쌍 {len(ca)}건, 과제 {len(ids_a)}개({', '.join(ids_a)}). "
+            f"expA long 전체 {len(old)}건 중 {len(ca)}건, expE 전체 {len(var)}건 중 {len(ca)}건을 비교한다(나머지는 제외). {len(ca)}건도 {report.MIN_SAMPLE}건 미만이다.",
+            "- 열 이름: expEctl = 변형 없는 long(같은 시기 대조), long = expA의 long(보조 비교 기준), long_filename = 같은 long 설정 + file_stats 출력 앞에 "
+            "`path: <입력 경로>` 한 줄. 도구 설명 long, 프롬프트 v1, max_turns 20, haiku로 같다.",
+            "- 시기 효과: 두 조건의 실행 시기 차이는 위 첫 줄을 따르며, 시기 효과를 완전히 분리하지는 못한다(가설 수준으로만 해석).",
             "- 실패 유형은 채점기가 기록한 failure_type 그대로다."]
-    out.rec("비교 범위(쌍 수)", "long-long_filename", len(common), None, len(common), ", ".join(ids))
-    bodies = [_section1(sub, sels, out, COLUMNS_E, ROWS_E), _section_pass_by_task(sub, COLUMNS_E, ids, out),
-              _section5(cols, raw_dir, out, COLUMNS_E, PROBE_NAMES_E)]
+    out.rec("비교 범위(쌍 수)", "expEctl-long_filename", len(cm), None, len(cm), ", ".join(ids_m))
+    aux.rec("비교 범위(쌍 수)", "long-long_filename", len(ca), None, len(ca), ", ".join(ids_a))
+    main_body = _section1(sub_m, sels, out, COLUMNS_E_MAIN, ROWS_E) + [
+        "", f"- 표본: 주 비교는 {who} x {runs_m}회 = {len(cm)}건 대 {len(cm)}건이다. {report.SMALL_SAMPLE_WARNING}."]
+    aux_body = _section1(sub_a, sels, aux, COLUMNS_E, ROWS_E)
+    task_body = _section_pass_by_task(sub_a, COLUMNS_E, ids_a, aux)
+    _aux_records(aux, out)
+    bodies = [main_body, aux_body, task_body, _section5(cols, raw_dir, out, ["expEctl", "long", "long_filename"], PROBE_NAMES_E)]
     lines = head + [""]
     for title, body in zip(SECTION_TITLES_E, bodies):
         lines += [title, ""] + body + [""]
@@ -821,7 +884,7 @@ def main(argv: list[str] | None = None) -> int:
     prefixes = {"A": PREFIXES, "B": PREFIXES_B, "C": PREFIXES_C, "D": PREFIXES_D, "E": PREFIXES_E, "F": PREFIXES_F}[a.exp]
     builder = {"A": build_compare, "B": build_compare_b, "C": build_compare_c, "D": build_compare_d, "E": build_compare_e, "F": build_compare_f}[a.exp]
     cols = collect(a.raw_dir, prefixes)
-    baseline_keys = {"A": set(), "B": {"default"}, "C": {"default"}, "D": {"haiku"}, "E": {"long"}, "F": {"long"}}[a.exp]
+    baseline_keys = {"A": set(), "B": {"default"}, "C": {"default"}, "D": {"haiku"}, "E": {"long", "expEctl"}, "F": {"long"}}[a.exp]
     if not any(v for k, v in cols.items() if k not in baseline_keys):
         print("읽을 로그가 없다" if a.exp == "A" else f"실험 {a.exp} 로그가 없다(baseline만 있거나 비어 있음)", file=sys.stderr)
         return 1
