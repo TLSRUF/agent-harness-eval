@@ -963,63 +963,123 @@ def test_c_normal_termination_rate_warns_on_small_samples(tmp_path):
     assert report.SMALL_SAMPLE_WARNING in cells_c(ec.build_from_dir_c(tmp_path), "정상 종료율")[-1]
 
 
-# ---------------- 실험 E: expA long vs expE long + filename (같은 (과제, run) 쌍만) ----------------
+# ---------------- 실험 E: 주 비교 expEctl(long) vs expE(long + filename), 보조 비교 expA long vs expE ----------------
 
-PREFIX.update({"long_filename": "expE_haiku_longFilename"})
+PREFIX.update({"long_filename": "expE_haiku_longFilename", "expEctl": "expEctl_haiku_long"})
 COLS_E = ["long", "long_filename"]
+COLS_E_MAIN = ["expEctl", "long_filename"]
 E_TASKS = ["E03", "E10", "M09", "M10", "H01", "H02", "H04", "H08"]
+TS_A = "2026-11-12T03:30:00.000+00:00"           # expA long (3일 전)
+TS_E = "2026-11-15T06:09:12.000+00:00"           # expE 마지막 실행 종료
+TS_CTL = "2026-11-15T06:11:30.000+00:00"         # expEctl 첫 실행 종료(138초 뒤 -> 2분)
+TIME_NOTE = "expEctl과 expE는 2026-11-15에 2분 간격으로 연달아 실행, expA long은 2026-11-12 실행(3일 전)"
 
 
-def cells_e(text, label):
-    sec = text[text.index(ec.SECTION_TITLES_E[0]):text.index(ec.SECTION_TITLES_E[1])]
-    lines = [ln for ln in sec.splitlines() if ln.startswith(f"| {label}")]
+def _e_sec(text, i):
+    titles = ec.SECTION_TITLES_E
+    return text[text.index(titles[i]):text.index(titles[i + 1]) if i + 1 < len(titles) else len(text)]
+
+
+def cells_e(text, label, i=0):
+    lines = [ln for ln in _e_sec(text, i).splitlines() if ln.startswith(f"| {label}")]
     assert len(lines) == 1, (label, lines)
     return [c.strip() for c in lines[0].strip().strip("|").split("|")]
 
 
-def _e_setup(tmp_path):
+def _e_setup(tmp_path, ts_ctl=TS_CTL, ts_e=TS_E, ts_a=TS_A):
     for t in TASKS:
         for r in (1, 2, 3):
-            make(tmp_path, "long", t, r, [[F_CUSTOM]] if t in E_TASKS else [[S_CUSTOM]], cost=0.01)      # expA long 전체 120건
+            make(tmp_path, "long", t, r, [[F_CUSTOM]] if t in E_TASKS else [[S_CUSTOM]], cost=0.01, ts=ts_a)      # expA long 전체 120건
     for t in E_TASKS:
         for r in (1, 2, 3):
-            make(tmp_path, "long_filename", t, r, [[F_CUSTOM]], cost=0.02)
+            make(tmp_path, "long_filename", t, r, [[F_CUSTOM]], cost=0.02, ts=ts_e)
+    for r in (1, 2, 3):
+        make(tmp_path, "expEctl", "H01", r, [[F_CUSTOM]], cost=0.015, ts=ts_ctl)                                   # 같은 날 대조 H01 3회
 
 
-def test_e_scope_columns_rows_and_titles_are_fixed(tmp_path):
+def test_e_titles_are_fixed_and_main_comparison_comes_first(tmp_path):
+    assert ec.SECTION_TITLES_E == ["## 1. 주 비교: expEctl(long) vs expE(long_filename), 같은 날 연달아 실행 (H01 한 과제 3회뿐)",
+                                   "## 2. 보조 비교: expA long vs expE(long_filename), 3일 전 기준 (같은 (과제, run) 쌍만)",
+                                   "## 3. 과제별 통과 횟수 (3회 중, 보조 비교 기준)", "## 4. 한도와 배치별 비용"]
+    assert ec.COLUMNS_E == COLS_E and ec.COLUMNS_E_MAIN == COLS_E_MAIN
+    _e_setup(tmp_path)
+    text = ec.build_from_dir_e(tmp_path)
+    pos = [text.index(t) for t in ec.SECTION_TITLES_E]
+    assert pos == sorted(pos)
+    assert "| 지표 | expEctl | long_filename | 표본 |" in _e_sec(text, 0)
+    assert "| 지표 | long | long_filename | 표본 |" in _e_sec(text, 1)
+
+
+def test_e_top_lines_state_run_times_and_small_sample_before_any_table(tmp_path):
     _e_setup(tmp_path)
     text = ec.build_from_dir_e(tmp_path)
     assert text.startswith("# 실험 E 비교표 (exp_compare)\n")
     head = text[:text.index(ec.SECTION_TITLES_E[0])]
-    assert "비교 범위: 같은 (과제, run) 쌍 24건, 과제 8개(E03, E10, H01, H02, H04, H08, M09, M10)" in head
+    assert TIME_NOTE in head
+    assert head.index(TIME_NOTE) < head.index("비교 범위")                                              # 맨 위(첫 설명 줄)
+    assert "H01 한 과제" in head and "3회" in head and report.SMALL_SAMPLE_WARNING in head
+    assert "주 비교 범위: 같은 (과제, run) 쌍 3건, 과제 1개(H01)" in head
+    assert "보조 비교 범위: 같은 (과제, run) 쌍 24건, 과제 8개(E03, E10, H01, H02, H04, H08, M09, M10)" in head
     assert f"expA long 전체 {3 * len(TASKS)}건 중 24건" in head and "expE 전체 24건 중 24건" in head
-    assert ec.COLUMNS_E == COLS_E
-    assert ec.SECTION_TITLES_E == ["## 1. long vs long + 파일 이름 출력 (같은 (과제, run) 쌍만)", "## 2. 과제별 통과 횟수 (3회 중)", "## 3. 한도와 배치별 비용"]
-    assert "| 지표 | long | long_filename | 표본 |" in text
-    sec = text[text.index(ec.SECTION_TITLES_E[0]):text.index(ec.SECTION_TITLES_E[1])]
+
+
+def test_e_main_table_says_h01_only_three_runs_and_warns(tmp_path):
+    _e_setup(tmp_path)
+    text = ec.build_from_dir_e(tmp_path)
+    sec = _e_sec(text, 0)
     rows = [ln.split("|")[1].strip() for ln in sec.splitlines() if ln.startswith("| ") and not ln.startswith("| 지표")]
     assert rows == ["성공률", "실패 유형", "file_stats 선택률", "평균 도구 호출 수", "평균 모델 응답 수", "실행당 평균 비용"]
     for ln in sec.splitlines():
         if ln.startswith("| ") and not ln.startswith("| 지표"):
-            assert re.search(r"N=\d+, 과제당 [\d~]+회.*총 \d+건", ln), ln
-    assert report.SMALL_SAMPLE_WARNING in cells_e(text, "성공률")[-1]                                   # 24건 < 30
+            assert "N=1, 과제당 3회" in ln and "총 3건" in ln and report.SMALL_SAMPLE_WARNING in ln, ln
+    assert "H01 한 과제 x 3회" in sec                                                                   # 표 아래 명시 줄
 
 
-def test_e_compares_only_common_pairs_and_values(tmp_path):
+def test_e_main_values_use_only_the_common_h01_pairs_of_expEctl_and_expE(tmp_path):
     _e_setup(tmp_path)
-    make(tmp_path, "long_filename", "H01", 1, [[F_CUSTOM]], passed=False, cost=0.02)
-    make(tmp_path, "long", "H01", 2, [[S_BUILTIN]], passed=False, cost=0.05)
-    make(tmp_path, "long", "H01", 3, [[F_BUILTIN]], passed=False, failure_type="format_error", cost=0.05)
-    make(tmp_path, "long_filename", "E03", 4, [[F_CUSTOM]], cost=9.0)                                      # long에 run4가 없다 -> 제외
+    make(tmp_path, "expEctl", "H01", 2, [[F_BUILTIN]], passed=False, cost=0.05, ts=TS_CTL)
+    make(tmp_path, "expEctl", "H01", 3, [[F_BUILTIN]], passed=False, failure_type="format_error", cost=0.05, ts=TS_CTL)
+    make(tmp_path, "expEctl", "H01", 4, [[F_BUILTIN]], passed=False, cost=9.0, ts=TS_CTL)                 # expE에 run4가 없다 -> 제외
     text = ec.build_from_dir_e(tmp_path)
-    assert "같은 (과제, run) 쌍 24건" in text and "expE 전체 25건 중 24건" in text
-    assert cells_e(text, "성공률")[1] == "92% (22/24)" and cells_e(text, "성공률")[2] == "96% (23/24)"
+    assert cells_e(text, "성공률")[1] == "33% (1/3)" and cells_e(text, "성공률")[2] == "100% (3/3)"
     assert cells_e(text, "실패 유형")[1].startswith("wrong_value 1") and "format_error 1" in cells_e(text, "실패 유형")[1]
-    assert cells_e(text, "실패 유형")[2].startswith("wrong_value 1") and "format_error" not in cells_e(text, "실패 유형")[2]
-    assert cells_e(text, "file_stats 선택률")[2] == "100% (24/24)"
-    assert cells_e(text, "file_stats 선택률")[1] == f"{100 * 22 / 24:.0f}% (22/24)"
-    assert cells_e(text, "평균 도구 호출 수")[1] == "1.0"
-    assert cells_e(text, "실행당 평균 비용")[2] == "$0.0200"                                                 # run4(9.0)는 평균에 안 들어간다
+    assert cells_e(text, "실패 유형")[2] == "실패 없음(0건)"
+    assert cells_e(text, "file_stats 선택률")[2] == "100% (3/3)" and cells_e(text, "file_stats 선택률")[1] == "33% (1/3)"
+    assert cells_e(text, "실행당 평균 비용")[1] == "$0.0383" and cells_e(text, "실행당 평균 비용")[2] == "$0.0200"
+    assert "주 비교 범위: 같은 (과제, run) 쌍 3건" in text
+
+
+def test_e_aux_table_is_the_old_expA_long_comparison_and_is_marked_auxiliary(tmp_path):
+    _e_setup(tmp_path)
+    make(tmp_path, "long_filename", "H01", 1, [[F_CUSTOM]], passed=False, cost=0.02, ts=TS_E)
+    make(tmp_path, "long", "H01", 2, [[S_BUILTIN]], passed=False, cost=0.05, ts=TS_A)
+    make(tmp_path, "long_filename", "E03", 4, [[F_CUSTOM]], cost=9.0, ts=TS_E)                            # long에 run4가 없다 -> 제외
+    text = ec.build_from_dir_e(tmp_path)
+    assert "보조" in ec.SECTION_TITLES_E[1]
+    assert cells_e(text, "성공률", 1)[1] == "96% (23/24)" and cells_e(text, "성공률", 1)[2] == "96% (23/24)"
+    assert cells_e(text, "file_stats 선택률", 1)[1] == f"{100 * 23 / 24:.0f}% (23/24)"
+    assert cells_e(text, "실행당 평균 비용", 1)[2] == "$0.0200"                                          # run4(9.0)는 평균에 안 들어간다
+    assert report.SMALL_SAMPLE_WARNING in cells_e(text, "성공률", 1)[-1]                                  # 24건 < 30
+
+
+def test_e_time_note_is_computed_from_log_timestamps(tmp_path):
+    _e_setup(tmp_path, ts_ctl="2026-11-15T06:16:30.000+00:00", ts_a="2026-11-10T03:30:00.000+00:00")
+    head = ec.build_from_dir_e(tmp_path)
+    head = head[:head.index(ec.SECTION_TITLES_E[0])]
+    assert "expEctl과 expE는 2026-11-15에 7분 간격으로 연달아 실행, expA long은 2026-11-10 실행(5일 전)" in head
+
+
+def test_e_time_note_when_not_the_same_day_or_missing_timestamps(tmp_path):
+    _e_setup(tmp_path, ts_ctl="2026-11-16T06:11:30.000+00:00")
+    head = ec.build_from_dir_e(tmp_path)
+    head = head[:head.index(ec.SECTION_TITLES_E[0])]
+    assert "연달아 실행" not in head and "같은 날이 아님" in head and "2026-11-16" in head
+    other = tmp_path / "n"
+    other.mkdir()
+    _e_setup(other, ts_ctl=None, ts_e=None, ts_a=None)
+    head = ec.build_from_dir_e(other)
+    head = head[:head.index(ec.SECTION_TITLES_E[0])]
+    assert "실행 시각" in head and "확인 불가" in head and "연달아 실행" not in head
 
 
 def test_e_failure_type_none_and_missing_condition(tmp_path):
@@ -1031,16 +1091,16 @@ def test_e_failure_type_none_and_missing_condition(tmp_path):
     for t in E_TASKS:
         make(only, "long", t, 1)
     text = ec.build_from_dir_e(only)
-    assert "같은 (과제, run) 쌍 0건" in text and cells_e(text, "성공률")[2] == "n/a"
+    assert "주 비교 범위: 같은 (과제, run) 쌍 0건" in text and cells_e(text, "성공률")[2] == "n/a"
+    assert "보조 비교 범위: 같은 (과제, run) 쌍 0건" in text and cells_e(text, "성공률", 1)[2] == "n/a"
 
 
-def test_e_per_task_pass_table(tmp_path):
+def test_e_per_task_pass_table_is_the_aux_basis(tmp_path):
     _e_setup(tmp_path)
     make(tmp_path, "long", "H01", 1, [[F_CUSTOM]], passed=False)
     make(tmp_path, "long", "H01", 2, [[F_CUSTOM]], passed=False)
     make(tmp_path, "long_filename", "H01", 3, [[F_CUSTOM]], passed=False)
-    sec = ec.build_from_dir_e(tmp_path)
-    sec = sec[sec.index(ec.SECTION_TITLES_E[1]):sec.index(ec.SECTION_TITLES_E[2])]
+    sec = _e_sec(ec.build_from_dir_e(tmp_path), 2)
     assert "| 과제 | long | long_filename |" in sec
     row = lambda t: [c.strip() for c in next(ln for ln in sec.splitlines() if ln.startswith(f"| {t} |")).strip().strip("|").split("|")]
     assert row("H01")[1:] == ["1/3", "2/3"] and row("E03")[1:] == ["3/3", "3/3"]
@@ -1053,19 +1113,28 @@ def test_e_probes_use_expE_names_and_main_exp_e(tmp_path):
     _probe(tmp_path, "expE-longFilename", "start", 0.40, 0.2, t0)
     _probe(tmp_path, "expE-longFilename", "end", 0.41, 0.2, t1)
     make(tmp_path, "long_filename", "H01", 1, cost=0.1, ts="2026-11-12T03:10:00.000+00:00")
-    sec = ec.build_from_dir_e(tmp_path)
-    sec = sec[sec.index(ec.SECTION_TITLES_E[2]):]
+    sec = _e_sec(ec.build_from_dir_e(tmp_path), 3)
     line = next(ln for ln in sec.splitlines() if ln.startswith("| long_filename |"))
     assert "+0.01" in line and "| 1 | $0.1000 |" in line
     raw = tmp_path / "raw"
     raw.mkdir()
     for t in E_TASKS:
         make(raw, "long", t, 1)
+    make(raw, "expEctl", "H01", 1)
     args = ["--exp", "E", "--raw-dir", str(raw), "--out-md", str(tmp_path / "e.md"), "--out-csv", str(tmp_path / "e.csv")]
-    assert ec.main(args) == 1                                                                         # expA long만 있으면 거부
+    assert ec.main(args) == 1                                                                         # 기준 열(expA long, expEctl)만 있으면 거부
     make(raw, "long_filename", "H01", 1)
     assert ec.main(args) == 0
     assert (tmp_path / "e.md").read_text(encoding="utf-8").startswith("# 실험 E 비교표")
+
+
+def test_e_ctl_probe_row_appears_with_its_own_probe_name(tmp_path):
+    _e_setup(tmp_path)
+    _probe(tmp_path, "expEctl-long", "start", 0.50, 0.2, "2026-11-15T06:10:00.000+00:00")
+    _probe(tmp_path, "expEctl-long", "end", 0.52, 0.2, "2026-11-15T06:12:00.000+00:00")
+    sec = _e_sec(ec.build_from_dir_e(tmp_path), 3)
+    line = next(ln for ln in sec.splitlines() if ln.startswith("| expEctl |"))
+    assert "+0.02" in line and "| 3 | $0.0450 |" in line
 
 
 def test_e_collect_does_not_mix_other_experiments_and_tables_are_consistent(tmp_path):
@@ -1073,7 +1142,7 @@ def test_e_collect_does_not_mix_other_experiments_and_tables_are_consistent(tmp_
     fill_all(tmp_path, "short")
     (tmp_path / "expE_haiku_longFilename_summary.jsonl").write_text("{}", encoding="utf-8")
     cols = ec.collect(tmp_path, ec.PREFIXES_E)
-    assert len(cols["long"]) == 3 * len(TASKS) and len(cols["long_filename"]) == 24
+    assert len(cols["long"]) == 3 * len(TASKS) and len(cols["long_filename"]) == 24 and len(cols["expEctl"]) == 3
     width = None
     for ln in ec.build_from_dir_e(tmp_path).splitlines():
         if not ln.startswith("|"):
@@ -1084,13 +1153,18 @@ def test_e_collect_does_not_mix_other_experiments_and_tables_are_consistent(tmp_
         assert n == width, ln
 
 
-def test_e_failure_type_record_counts_only_failures(tmp_path):
+def test_e_failure_type_records_main_and_aux_do_not_collide(tmp_path):
     _e_setup(tmp_path)
     make(tmp_path, "long", "H01", 1, [[F_CUSTOM]], passed=False)
+    make(tmp_path, "expEctl", "H01", 1, [[F_CUSTOM]], passed=False, ts=TS_CTL)
     out = ec._Out()
     ec.build_compare_e(ec.collect(tmp_path, ec.PREFIXES_E), tmp_path, None, out)
-    rec = {r["config"]: r for r in out.records if r["metric"] == "실패 유형"}
-    assert rec["long"]["numerator"] == 1 and rec["long_filename"]["numerator"] == 0              # 통과 실행은 세지 않는다
+    keys = [(r["metric"], r["config"], r["task"]) for r in out.records]
+    assert len(keys) == len(set(keys))                                                                # 같은 (지표, 설정, 과제) 행이 둘 있으면 CSV를 읽을 수 없다
+    main = {r["config"]: r for r in out.records if r["metric"] == "실패 유형"}
+    aux = {r["config"]: r for r in out.records if r["metric"] == "보조 실패 유형"}
+    assert main["expEctl"]["numerator"] == 1 and main["long_filename"]["numerator"] == 0              # 통과 실행은 세지 않는다
+    assert aux["long"]["numerator"] == 1 and aux["long_filename"]["numerator"] == 0
 
 
 # ---------------- 실험 F: expFctl(long) vs expF(long + countline), 같은 (과제, run) 쌍만 ----------------
