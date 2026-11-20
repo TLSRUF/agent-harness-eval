@@ -247,6 +247,23 @@ def test_png_files_do_not_contain_personal_values_in_raw_bytes():
     assert not bad, bad
 
 
-def test_git_commit_email_configured_here_is_noreply():
-    mail = (_git("config", "user.email") or "").strip()
-    assert mail.endswith("@users.noreply.github.com")
+# Day 1, Day 2 커밋 2개는 noreply가 아닌 주소로 만들어졌다(이미 푸시된 히스토리라 다시 쓰지 않고 해시로 명시해 예외 처리).
+# 이 PC의 git 설정이 아니라 히스토리를 검사하므로 새 클론에서도 같은 결과가 나온다.
+LEGACY_NON_NOREPLY = {"16ba9bc9304dffd790af1c2c04079a6e27ecfed8", "46b3399627c7676bea60edad4170329c821c2180"}
+
+
+def test_every_commit_author_is_noreply_except_the_two_known_legacy_commits():
+    out = _git("log", "--format=%H %ae")
+    if out is None:
+        pytest.skip("git 저장소가 아님")
+    bad = [ln.split()[0][:7] for ln in out.strip().split("\n")
+           if ln and ln.split()[0] not in LEGACY_NON_NOREPLY and not ln.split()[1].endswith("@users.noreply.github.com")]
+    assert not bad, bad                                                                # 값은 출력하지 않고 해시 앞 7자리만
+
+
+def test_legacy_non_noreply_commits_are_exactly_the_known_two_if_history_is_unrewritten():
+    out = _git("log", "--format=%H %ae")
+    if out is None:
+        pytest.skip("git 저장소가 아님")
+    found = {ln.split()[0] for ln in out.strip().split("\n") if ln and not ln.split()[1].endswith("@users.noreply.github.com")}
+    assert found <= LEGACY_NON_NOREPLY
