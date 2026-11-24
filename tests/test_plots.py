@@ -22,7 +22,7 @@ PREFIX = {
     "verify": "expB_haiku_verify", "verify_tool": "expB_haiku_verifyTool",
     "mt3": "expC_haiku_maxTurns3", "mt4": "expC_haiku_maxTurns4", "mt5": "expC_haiku_maxTurns5", "mt7": "expC_haiku_maxTurns7",
     "sonnet": "expD_sonnet_default",
-    "e": "expE_haiku_longFilename", "fctl": "expFctl_haiku_long", "f": "expF_haiku_longCountline",
+    "e": "expE_haiku_longFilename", "ectl": "expEctl_haiku_long", "fctl": "expFctl_haiku_long", "f": "expF_haiku_longCountline",
 }
 
 
@@ -77,6 +77,8 @@ def raw(tmp_path):
     for t in E_TASKS:
         for r in (1, 2, 3):
             make(d, "e", t, r, [[F_CUSTOM]], passed=(t != "H01" or r < 3))
+    for r in (1, 2, 3):
+        make(d, "ectl", "H01", r, [[F_CUSTOM]], passed=(r == 1))              # 같은 날 대조(expEctl)는 H01만: 1/3
     for t in F_TASKS:
         for r in range(1, 6):
             make(d, "fctl", t, r, [[S_CUSTOM]], passed=(r != 5))
@@ -164,8 +166,28 @@ def test_fig4_uses_only_common_pairs_and_means(raw, out):
 
 def test_fig5_pass_counts_per_task_for_e_and_f(raw, out):
     d = by_name(plots.generate_all(raw, out, lang="en")[0])["fig5_expEF_pass_by_task.png"].data
-    assert d["E"]["long_filename"]["H01"] == (2, 3) and d["E"]["long"]["E03"] == (3, 3) and set(d["E"]["long"]) == set(E_TASKS)
+    # E 패널의 주 비교 = 같은 날 대조 expEctl 대 expE (H01만)
+    assert set(d["E"]) == {"expEctl", "long_filename"} and set(d["E"]["expEctl"]) == {"H01"}
+    assert d["E"]["expEctl"]["H01"] == (1, 3) and d["E"]["long_filename"]["H01"] == (2, 3)
+    # 보조 = 3일 전 expA long 대 expE (8과제)
+    assert set(d["E_aux"]) == {"long", "long_filename"} and set(d["E_aux"]["long"]) == set(E_TASKS)
+    assert d["E_aux"]["long"]["E03"] == (3, 3) and d["E_aux"]["long_filename"]["H01"] == (2, 3)
     assert d["F"]["long"]["M01"] == (4, 5) and d["F"]["long_countline"]["M01"] == (5, 5) and set(d["F"]["long"]) == set(F_TASKS)
+
+
+def test_fig5_e_main_panel_is_titled_with_the_main_comparison_and_keeps_sample_sizes(raw, out):
+    f = by_name(plots.generate_all(raw, out, lang="en")[0])["fig5_expEF_pass_by_task.png"]
+    assert "expEctl vs expE" in f.title and "auxiliary" in f.title
+    assert f.panel_titles["E"].startswith("Experiment E main") and "N=1 tasks, 3 runs per task / total 3 runs" in f.panel_titles["E"]
+    assert "auxiliary" in f.panel_titles["E_aux"] and "N=8 tasks, 3 runs per task / total 24 runs" in f.panel_titles["E_aux"]
+    assert "N=4 tasks, 5 runs per task / total 20 runs" in f.panel_titles["F"]
+
+
+def test_fig5_without_expEctl_logs_still_draws_the_auxiliary_e_panel(raw, out):
+    for p in raw.glob("expEctl_*"):
+        p.unlink()
+    d = by_name(plots.generate_all(raw, out, lang="en")[0])["fig5_expEF_pass_by_task.png"].data
+    assert "E" not in d and "E_aux" in d and "F" in d
 
 
 def test_fig6_consistency_rates_per_config(raw, out):

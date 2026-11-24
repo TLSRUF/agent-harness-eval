@@ -381,8 +381,12 @@ def _sample_lines(sub, columns, names=None) -> list[str]:
     return [f"- {(names or {}).get(c, c)}: {report.sample_label(ec._per_task(sub[c]))}" if sub[c] else f"- {(names or {}).get(c, c)}: 로그 없음" for c in columns]
 
 
+PASS_KEY, PASS_LABEL = "성공률", "채점 통과율"       # exp_compare의 행 키(코드 식별자)와 문서에 쓰는 이름
+
+
 def _table(sub, columns, rows, sels) -> list[str]:
-    return ec._section1(sub, sels, ec._Out(), columns, rows)
+    lines = ec._section1(sub, sels, ec._Out(), columns, rows)
+    return [("| " + PASS_LABEL + ln[len("| " + PASS_KEY):]) if ln.startswith("| " + PASS_KEY + " |") else ln for ln in lines]
 
 
 ROWS_A = ["성공률", "error_max_turns 건수", "search_text 선택률", "Grep 사용률", "file_stats 선택률", "Read 사용률", "check_result 사용률",
@@ -411,42 +415,42 @@ def _has_logs(cols, columns) -> bool:
 
 def section_a(raw_dir, tasks, sels):
     cols = ec.collect(raw_dir, ec.PREFIXES)
-    title, q = "A — 도구 설명 버전", "도구 설명(default, short, long, long_directive)을 바꾸면 커스텀 도구(search_text, file_stats) 선택과 성공률이 달라지는가?"
+    title, q = "A — 도구 설명 버전", "도구 설명(default, short, long, long_directive)을 바꾸면 커스텀 도구(search_text, file_stats) 선택과 채점 통과율이 달라지는가?"
     setting = ["도구 설명 버전만 바꾼다(프롬프트 v1, max_turns 20, haiku). default = 베이스라인, short = 짧은 설명, long = 사용 조건을 적은 긴 설명, "
                "long_directive = long + 우선 사용 지시 한 문장."]
     limits = ["과제당 3회뿐이라 반복 사이 우연 범위가 크다(search_text|Grep 쌍 과제 12개, file_stats|Read 쌍 과제 8개).",
-              "베이스라인 성공률이 높아 성공률 차이를 볼 여지가 작다(천장 효과).", "선택률은 쌍 과제에서 커스텀 도구를 한 번이라도 호출한 실행의 비율이며 도구가 더 좋아졌다는 뜻이 아니다."]
+              "베이스라인 채점 통과율이 높아 채점 통과율 차이를 볼 여지가 작다(천장 효과).", "선택률은 쌍 과제에서 커스텀 도구를 한 번이라도 호출한 실행의 비율이며 도구가 더 좋아졌다는 뜻이 아니다."]
     if not _has_logs(cols, ec.COLUMNS):
         return _missing(title, q, setting, limits)
     c = ec.COLUMNS
-    obs = [f"성공률 " + ", ".join(f"{x} {_pass(cols, x)}" for x in c) + ".",
+    obs = [f"채점 통과율 " + ", ".join(f"{x} {_pass(cols, x)}" for x in c) + ".",
            "search_text 선택률(search_text|Grep 쌍 과제) " + ", ".join(f"{x} {_sel(cols, x, sels, 'search_text 선택률')}" for x in c) + ".",
            "file_stats 선택률(file_stats|Read 쌍 과제) " + ", ".join(f"{x} {_sel(cols, x, sels, 'file_stats 선택률')}" for x in c) + "."]
     hyp = ["도구 설명에 쓰임새와 반환 정보를 적으면 커스텀 도구 선택이 늘어난다(특히 file_stats). 반복 사이 우연 범위를 넘는지는 exp_compare --exp A의 3~4절로 판정한다.",
-           "선택률이 오른 도구가 성공률을 올리는지는 이 데이터로 확인 불가(성공률이 이미 높다)."]
+           "선택률이 달라진 도구가 채점 통과율을 바꾸는지는 이 데이터로 확인 불가(채점 통과율이 이미 높다)."]
     return _section(title, q, setting, _sample_lines(cols, c), _table(cols, c, ROWS_A, sels), obs, hyp, limits)
 
 
 def section_b(raw_dir, tasks, sels):
     cols = ec.collect(raw_dir, ec.PREFIXES_B)
-    title, q = "B — 검증 지시", "시스템 프롬프트에 검증 지시(verify) 또는 check_result 사용 지시(verify_tool)를 넣으면 검증 행동과 성공률이 달라지는가?"
+    title, q = "B — 검증 지시", "시스템 프롬프트에 검증 지시(verify) 또는 check_result 사용 지시(verify_tool)를 넣으면 검증 행동과 채점 통과율이 달라지는가?"
     setting = ["프롬프트 버전만 바꾼다(default = v1, verify = 끝나기 전 결과 확인 지시, verify_tool = check_result 사용을 명시; 도구 설명 default, max_turns 20, haiku)."]
     limits = ["check_result는 파일 존재, 포함 문자열, 최소 줄 수만 확인하며 값의 정확성은 확인하지 않는다. 사용률은 검증 행동의 증가이지 정확성의 증가가 아니다.",
-              "과제당 3회, 베이스라인 성공률이 높아 성공률 차이를 보기 어렵다."]
+              "과제당 3회, 베이스라인 채점 통과율이 높아 채점 통과율 차이를 보기 어렵다."]
     if not _has_logs(cols, ec.COLUMNS_B):
         return _missing(title, q, setting, limits)
     c = ec.COLUMNS_B
     obs = ["check_result 사용률 " + ", ".join(f"{x} {_sel(cols, x, sels, 'check_result 사용률')}" for x in c) + ".",
-           "성공률 " + ", ".join(f"{x} {_pass(cols, x)}" for x in c) + "."]
-    hyp = ["지시문이 검증 행동(check_result 호출)을 늘린다.", "늘어난 검증이 값 오류를 줄이는지는 확인 불가(check_result가 값을 검사하지 않고 성공률도 천장 근처)."]
+           "채점 통과율 " + ", ".join(f"{x} {_pass(cols, x)}" for x in c) + "."]
+    hyp = ["지시문이 검증 행동(check_result 호출)을 늘린다.", "검증 호출이 값 오류를 줄이는지는 확인 불가(check_result가 값을 검사하지 않고 채점 통과율도 천장 근처)."]
     return _section(title, q, setting, _sample_lines(cols, c), _table(cols, c, ROWS_B2, sels), obs, hyp, limits)
 
 
 def section_c(raw_dir, tasks, sels):
     cols = ec.collect(raw_dir, ec.PREFIXES_C)
-    title, q = "C — 최대 턴 수", "max_turns를 3, 4, 5, 7로 줄이면 정상 종료율과 성공률은 어떻게 변하는가? (default = max_turns 20)"
+    title, q = "C — 최대 턴 수", "max_turns를 3, 4, 5, 7로 줄이면 정상 종료율과 채점 통과율은 어떻게 변하는가? (default = max_turns 20)"
     setting = ["max_turns만 바꾼다(도구 설명 default, 프롬프트 v1, haiku). 20은 베이스라인."]
-    limits = ["error_max_turns로 끝났지만 파일 결과가 채점을 통과한 실행이 있어 성공률과 정상 종료율은 다른 지표다.",
+    limits = ["error_max_turns로 끝났지만 파일 결과가 채점을 통과한 실행이 있어 채점 통과율과 정상 종료율은 다른 지표다.",
               "한계 규칙(응답 수가 max_turns를 넘으려 할 때 중단)은 max_turns 3, 4, 5에서만 확인했고 7과 20은 확인 불가(한계에 걸린 실행이 없다).", "과제당 3회."]
     if not _has_logs(cols, ec.COLUMNS_C):
         return _missing(title, q, setting, limits)
@@ -454,7 +458,7 @@ def section_c(raw_dir, tasks, sels):
     cut = cut_pass_stats(raw_dir)
     cut_obs, cut_hyp = render_cut_summary(cut)
     obs = ["정상 종료율(error_max_turns가 아닌 실행) " + ", ".join(f"max_turns {x} {_normal(cols, x)}" for x in c) + ".",
-           "성공률 " + ", ".join(f"max_turns {x} {_pass(cols, x)}" for x in c) + ".", cut_obs]
+           "채점 통과율 " + ", ".join(f"max_turns {x} {_pass(cols, x)}" for x in c) + ".", cut_obs]
     hyp = [cut_hyp, "한계 판정 규칙은 응답 수 > max_turns일 때 중단(max_turns 3, 4, 5에서 일치, 가설 수준)."]
     return _section(title, q, setting, _sample_lines(cols, c), _table(cols, c, ROWS_C2, sels), obs, hyp, limits,
                     extra=[("제한에 걸렸지만 통과한 실행의 쓰기 시점(max_turns별)", render_cut_table(cut))])
@@ -462,18 +466,18 @@ def section_c(raw_dir, tasks, sels):
 
 def section_d(raw_dir, tasks, sels):
     cols = ec.collect(raw_dir, ec.PREFIXES_D)
-    title, q = "D — 모델 비교", "같은 하네스 설정에서 sonnet은 haiku보다 성공률과 비용이 얼마나 다른가?"
+    title, q = "D — 모델 비교", "같은 하네스 설정에서 sonnet은 haiku보다 채점 통과율과 비용이 얼마나 다른가?"
     setting = ["모델만 바꾼다(haiku = 베이스라인 claude-haiku-5-5, sonnet = claude-sonnet-5-5; 도구 설명 default, 프롬프트 v1, max_turns 20). 같은 (과제, run) 쌍만 비교한다."]
-    limits = ["과제당 1회(같은 쌍)라 반복 사이 변동을 알 수 없다.", "두 모델 모두 성공률이 천장이라 정확도 차이는 이 평가셋으로 가릴 수 없다.", "비용은 정가 환산 추정치이며 구독 한도 소모와 별개다."]
+    limits = ["과제당 1회(같은 쌍)라 반복 사이 변동을 알 수 없다.", "두 모델 모두 채점 통과율이 천장이라 채점 통과율 차이는 이 평가셋으로 가릴 수 없다. 정확성은 측정하지 않았다.", "비용은 정가 환산 추정치이며 구독 한도 소모와 별개다."]
     if not _has_logs(cols, ec.COLUMNS_D):
         return _missing(title, q, setting, limits)
     c = ec.COLUMNS_D
     sub, _ = _common_sub(cols, "haiku", "sonnet", c)
     ratio = cost_ratio_rows(cols)
     tot = sum(r["sonnet"] for r in ratio) / sum(r["haiku"] for r in ratio) if ratio else None
-    obs = ["성공률 " + ", ".join(f"{x} {_pass(sub, x)}" for x in c) + ".",
+    obs = ["채점 통과율 " + ", ".join(f"{x} {_pass(sub, x)}" for x in c) + ".",
            f"전체 평균 비용 비율(sonnet 합 / haiku 합) {tot:.1f}배(과제 {len(ratio)}개)." if tot else "비용 비율: 로그 없음."]
-    hyp = ["성공률이 같으므로 이 평가셋에서는 sonnet의 비용 증가에 대응하는 정확도 이득이 보이지 않는다(천장 효과 때문에 더 어려운 평가셋에서의 차이는 확인 불가)."]
+    hyp = ["채점 통과율이 같으므로 이 평가셋에서는 sonnet의 비용 차이에 대응하는 채점 통과율 차이가 보이지 않는다(천장 효과 때문에 더 어려운 평가셋에서의 차이는 확인 불가)."]
     return _section(title, q, setting, _sample_lines(sub, c), _table(sub, c, ROWS_D2, sels), obs, hyp, limits,
                     extra=[("과제별 비용 비율(sonnet/haiku)", render_cost_ratio(ratio))])
 
@@ -493,8 +497,8 @@ def section_e(raw_dir, tasks, sels):
     sub_m, common_m = _common_sub(cols, "expEctl", "long_filename", cm)
     h01 = h01_rows(raw_dir, tasks)
     hm = {r["condition"]: r for r in h01}
-    obs = ["성공률(주 비교, 같은 (과제, run) 쌍 " + f"{len(common_m)}건) " + ", ".join(f"{x} {_pass(sub_m, x)}" for x in cm) + ".",
-           "성공률(보조 비교, 같은 (과제, run) 쌍 " + f"{len(common_a)}건) " + ", ".join(f"{x} {_pass(sub_a, x)}" for x in c) + ".",
+    obs = ["채점 통과율(주 비교, 같은 (과제, run) 쌍 " + f"{len(common_m)}건) " + ", ".join(f"{x} {_pass(sub_m, x)}" for x in cm) + ".",
+           "채점 통과율(보조 비교, 같은 (과제, run) 쌍 " + f"{len(common_a)}건) " + ", ".join(f"{x} {_pass(sub_a, x)}" for x in c) + ".",
            "H01 통과: " + ", ".join(f"{k} {hm[k]['passed']}/{hm[k]['n']}" for k in H01_LABELS if hm[k]["n"]) + ". 실패한 실행은 모두 이름-값 짝 오류 유형이다."
            if all(hm[k]["pair_errors"] == hm[k]["failures"] for k in H01_LABELS) else
            "H01 통과: " + ", ".join(f"{k} {hm[k]['passed']}/{hm[k]['n']}" for k in H01_LABELS if hm[k]["n"]) + "."]
@@ -521,11 +525,11 @@ def section_f(raw_dir, tasks, sels):
     (k0, n0), (k1, n1) = rc["long"], rc["long_countline"]
     reach_txt = f"개입이 닿은 실행이 조건당 {k1}/{n1}" if (k0, n0) == (k1, n1) else f"개입이 닿은 실행: expFctl {k0}/{n0}, expF {k1}/{n1}"
     mech, fails = mechanism_rows(sub, tasks), failure_rows(sub, tasks)
-    obs = ["성공률 " + ", ".join(f"{F_NAMES[x]} {_pass(sub, x)}" for x in c) + f"(같은 (과제, run) 쌍 {len(common)}건).",
+    obs = ["채점 통과율 " + ", ".join(f"{F_NAMES[x]} {_pass(sub, x)}" for x in c) + f"(같은 (과제, run) 쌍 {len(common)}건).",
            f"{reach_txt}(search_text를 호출한 실행; 변형은 이 실행의 search_text 출력에만 닿는다).",
            "Grep count 모드 사용률 " + ", ".join(f"{F_NAMES[x]} {_sel(sub, x, sels, 'Grep count 모드 사용률')}" for x in c) + ".",
            f"실패 {len(fails)}건 중 {sum(f['cause'].startswith('에이전트 실수') for f in fails)}건은 도구 출력에 정답 개수가 있었는데 에이전트가 다르게 셌다."]
-    hyp = ["효과를 확인하지 못함: 개입이 닿은 실행이 조건당 소수이고 성공률 차이가 1건 수준이라 우연 범위 안이다.",
+    hyp = ["효과를 확인하지 못함: 개입이 닿은 실행이 조건당 소수이고 채점 통과율 차이가 1건 수준이다. 우연 범위와의 비교는 하지 않았다(확인 불가).",
            "실패는 도구 출력의 문제가 아니라 에이전트가 줄을 직접 세다가 틀린 것으로 보인다(Grep content 출력 줄 수를 직접 센 경우 포함). total matches가 이를 막는지는 개입이 닿은 표본이 작아 확인 불가."]
     return _section(title, q, setting, _sample_lines(sub, c, F_NAMES), _table(sub, c, ec.ROWS_F, sels), obs, hyp, limits,
                     extra=[(f"메커니즘: search_text를 쓴 실행만({len(mech)}건)", render_mechanism(mech)),
@@ -541,7 +545,8 @@ def build(raw_dir, tasks=None) -> str:
     sels = ec._selections(tasks)
     head = ["# 실험 결과 정리 (A~F)", "",
             "이 문서는 `python -m src.eval.results_summary`가 results/raw 로그에서 만든다(읽기 전용, 모델 호출 없음). 수치를 손으로 고치지 않는다. "
-            "모든 비율에 표본 크기(N, 과제당 M회, 총 건수)를 붙였고 30건 미만이면 경고를 표시한다. 해석 절의 \"관찰:\"은 로그에서 읽은 값, \"가설:\"은 해석이다.",
+            "모든 비율에 표본 크기(N, 과제당 M회, 총 건수)를 붙였고 30건 미만이면 경고를 표시한다. 해석 절의 \"관찰:\"은 로그에서 읽은 값, \"가설:\"은 해석이다. "
+            "채점 통과율은 실행 결과가 채점 함수를 통과한 비율이다. 정확성은 측정하지 않았다.",
             "", "## 목차", ""]
     head += [f"- 실험 {e} — {TOC_TEXT[e]}" for e in EXPS] + [""]
     body: list[str] = []

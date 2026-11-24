@@ -45,6 +45,7 @@ class Fig:
     path: Path | None
     title: str
     data: dict = field(default_factory=dict)
+    panel_titles: dict = field(default_factory=dict)        # 패널별 제목(표본 크기 포함), 테스트와 점검용
 
 
 # ---------------- 언어, 폰트, 표본 문구 ----------------
@@ -244,18 +245,23 @@ def _pass_by_task(cols_x, cs, base, other):
 
 
 def fig5(cols, tasks, lang, out_dir):
+    """실험 E는 주 비교(같은 날 연달아 돌린 expEctl 대 expE, H01만)와 보조 비교(3일 전 expA long 대 expE)를 따로 그리고, 실험 F를 옆에 둔다.
+    패널 제목마다 그 패널의 표본 크기(과제 수, 과제당 횟수, 총 건수)를 붙인다."""
+    specs = (("E", "E", ec.COLUMNS_E_MAIN, "실험 E 주 비교 (expEctl 대 expE, 같은 날)", "Experiment E main (expEctl vs expE, same day)"),
+             ("E_aux", "E", ec.COLUMNS_E, "실험 E 보조 (expA long 대 expE, 3일 전)", "Experiment E auxiliary (expA long vs expE, 3 days earlier)"),
+             ("F", "F", ec.COLUMNS_F, "실험 F (search_text 출력에 일치 개수)", "Experiment F (match count in search_text output)"))
     panels = []
-    for key, cs, ttl_ko, ttl_en in (("E", ec.COLUMNS_E, "실험 E (file_stats 출력에 파일 이름)", "Experiment E (file name in file_stats output)"),
-                                    ("F", ec.COLUMNS_F, "실험 F (search_text 출력에 일치 개수)", "Experiment F (match count in search_text output)")):
-        cx = cols[key]
+    for key, src, cs, ttl_ko, ttl_en in specs:
+        cx = cols[src]
         if cx[cs[0]] and cx[cs[1]]:
             data, sub, n = _pass_by_task(cx, cs, cs[0], cs[1])
             if n:
-                panels.append((key, cs, data, sub, n, _tr(lang, ttl_ko, ttl_en)))
+                label = _label({c: ec._per_task(sub[c]) for c in cs}, lang)
+                panels.append((key, cs, data, sub, n, _tr(lang, ttl_ko, ttl_en) + "\n" + label))
     if not panels:
         raise Skip("실험 E, F 로그가 없음")
     fig, axes = plt.subplots(1, len(panels), figsize=(5.6 * len(panels), 4.2), squeeze=False)
-    labels, dens, data_out = [], [], {}
+    labels, dens, data_out, panel_titles = [], [], {}, {}
     for ax, (key, cs, data, sub, n, ttl) in zip(axes[0], panels):
         ids = list(data[cs[0]])
         w = 0.8 / len(cs)
@@ -269,15 +275,17 @@ def fig5(cols, tasks, lang, out_dir):
         ax.set_ylim(0, top + 0.8)
         ax.set_yticks(range(0, top + 1))
         ax.set_ylabel(_tr(lang, f"통과 횟수 (최대 {top}회)", f"passes (max {top} runs)"))
-        ax.set_title(ttl, fontsize=9)
+        ax.set_title(ttl, fontsize=8)
         ax.legend(fontsize=8, loc="lower right")
         labels.append(f"{key}: " + _label({c: ec._per_task(sub[c]) for c in cs}, lang))
         dens.append(n)
         data_out[key] = data
+        panel_titles[key] = ttl
     label = "; ".join(labels) + _small(dens, lang)
-    head = _tr(lang, "실험 E, F: 조건별 과제별 통과 횟수", "Experiments E and F: passes per task by condition")
+    head = _tr(lang, "실험 E(주 비교: expEctl 대 expE, 보조: expA long 대 expE)와 F: 조건별 과제별 통과 횟수",
+               "Experiments E (main: expEctl vs expE; auxiliary: expA long vs expE) and F: passes per task by condition")
     _title(fig, head, label, fontsize=9)
-    return Fig(FIGURE_NAMES[4], _save(fig, out_dir, FIGURE_NAMES[4]), head + "\n" + label, data_out)
+    return Fig(FIGURE_NAMES[4], _save(fig, out_dir, FIGURE_NAMES[4]), head + "\n" + label, data_out, panel_titles)
 
 
 def fig6(cols, tasks, lang, out_dir):

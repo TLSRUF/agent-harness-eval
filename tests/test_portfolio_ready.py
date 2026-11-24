@@ -80,9 +80,8 @@ def test_30sec_summary_avoids_stronger_words_than_measured(name):
 def test_readme_has_author_and_linkedin(name):
     text = read(name)
     assert "신민결" in text
+    assert "https://www.linkedin.com/in/%EB%AF%BC%EA%B2%B0-%EC%8B%A0-8878ba406/" in text      # 자리표시자가 아니라 실제 주소
     assert "LinkedIn" in text
-    # 주소를 받지 못했으면 자리표시자("확인 불가")로 두고, 받았으면 linkedin.com 주소여야 한다
-    assert "linkedin.com/" in text or "확인 불가" in text or "unknown" in text
 
 
 @pytest.mark.parametrize("name,head", [("README.md", "## 핵심 발견"), ("README.en.md", "## Key findings")])
